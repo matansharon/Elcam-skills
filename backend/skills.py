@@ -1,5 +1,7 @@
 """Skills blueprint: CRUD with RBAC filtering and automatic versioning."""
-from flask import Blueprint, abort, jsonify, request
+import io
+
+from flask import Blueprint, abort, jsonify, request, send_file
 from flask_login import current_user, login_required
 
 from models import AuditLog, SkillVersion
@@ -139,6 +141,21 @@ def get_version(skill_id, version_number):
     if version is None:
         return jsonify({"error": "Version not found"}), 404
     return jsonify(version.to_dict())
+
+
+@skills_bp.get("/<int:skill_id>/versions/<int:version_number>/package")
+@login_required
+def download_package(skill_id, version_number):
+    skill = get_visible_skill_or_404(current_user, skill_id)
+    version = skill.versions.filter_by(version_number=version_number).first()
+    if version is None or version.package_blob is None:
+        abort(404, description="No package for this version")
+    return send_file(
+        io.BytesIO(version.package_blob),
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=version.package_filename or f"{skill.name}.skill",
+    )
 
 
 @skills_bp.post("/<int:skill_id>/versions/<int:version_number>/restore")

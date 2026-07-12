@@ -220,3 +220,46 @@ def test_upload_new_version_invisible_skill_is_404(client, admin_user,
     login(regular_user)
     resp = upload_version(client, skill_id, make_package("x", "d", "b"))
     assert resp.status_code == 404
+
+
+# --- Task 4: download the stored package -------------------------------------
+
+def test_download_package_returns_original_bytes(client, admin_user, login):
+    login(admin_user)
+    blob = make_package("dl-skill", "Downloadable", "Body",
+                        extra_files={"scripts/go.py": "pass"})
+    skill = upload(client, blob, filename="dl-skill.skill").get_json()
+
+    resp = client.get(f"/api/skills/{skill['id']}/versions/1/package")
+    assert resp.status_code == 200
+    assert resp.data == blob
+    assert resp.mimetype == "application/zip"
+    assert "dl-skill.skill" in resp.headers["Content-Disposition"]
+    assert "attachment" in resp.headers["Content-Disposition"]
+
+
+def test_download_package_readable_by_read_user(client, admin_user, regular_user,
+                                                grant, login):
+    login(admin_user)
+    blob = make_package("shared-dl", "Shared", "Body")
+    skill = upload(client, blob).get_json()
+    client.post("/api/auth/logout")
+
+    grant(regular_user, skill["id"], "read")
+    login(regular_user)
+    resp = client.get(f"/api/skills/{skill['id']}/versions/1/package")
+    assert resp.status_code == 200
+    assert resp.data == blob
+
+
+def test_download_package_404s(client, admin_user, regular_user, make_skill, login):
+    manual_id = make_skill(admin_user, "No Package Skill")
+    login(admin_user)
+    # manual version has no package
+    assert client.get(f"/api/skills/{manual_id}/versions/1/package").status_code == 404
+    # missing version
+    assert client.get(f"/api/skills/{manual_id}/versions/9/package").status_code == 404
+    client.post("/api/auth/logout")
+    # invisible skill: indistinguishable from nonexistent
+    login(regular_user)
+    assert client.get(f"/api/skills/{manual_id}/versions/1/package").status_code == 404
