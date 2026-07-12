@@ -79,4 +79,5 @@ def create_app(config_overrides=None):
 
 
 if __name__ == "__main__":
-    create_app().run(port=5000, debug=True)
+    port = int(os.environ.get("PORT", "5100"))
+    create_app().run(port=port, debug=True)
