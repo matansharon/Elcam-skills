@@ -2,12 +2,14 @@
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
+from models import AuditLog, SkillVersion
 from services import (
     create_skill,
     delete_skill,
     get_permission_level,
     get_visible_skill_or_404,
     require_edit,
+    restore_version,
     update_skill,
     visible_skills,
 )
@@ -76,3 +78,40 @@ def delete(skill_id):
     skill = get_visible_skill_or_404(current_user, skill_id)
     delete_skill(current_user, skill)
     return jsonify({"status": "deleted"})
+
+
+@skills_bp.get("/<int:skill_id>/versions")
+@login_required
+def list_versions(skill_id):
+    skill = get_visible_skill_or_404(current_user, skill_id)
+    versions = skill.versions.order_by(SkillVersion.version_number.desc()).all()
+    return jsonify([v.to_dict(include_content=False) for v in versions])
+
+
+@skills_bp.get("/<int:skill_id>/versions/<int:version_number>")
+@login_required
+def get_version(skill_id, version_number):
+    skill = get_visible_skill_or_404(current_user, skill_id)
+    version = skill.versions.filter_by(version_number=version_number).first()
+    if version is None:
+        return jsonify({"error": "Version not found"}), 404
+    return jsonify(version.to_dict())
+
+
+@skills_bp.post("/<int:skill_id>/versions/<int:version_number>/restore")
+@login_required
+def restore(skill_id, version_number):
+    skill = get_visible_skill_or_404(current_user, skill_id)
+    require_edit(current_user, skill)
+    version = restore_version(current_user, skill, version_number)
+    return jsonify(version.to_dict())
+
+
+@skills_bp.get("/<int:skill_id>/audit")
+@login_required
+def audit(skill_id):
+    skill = get_visible_skill_or_404(current_user, skill_id)
+    entries = skill.audit_entries.order_by(
+        AuditLog.created_at.desc(), AuditLog.id.desc()
+    ).all()
+    return jsonify([e.to_dict() for e in entries])
