@@ -27,9 +27,11 @@ def create_app(config_overrides=None):
         return jsonify({"error": "Authentication required"}), 401
 
     from auth import auth_bp
+    from relationships import relationships_bp
     from skills import skills_bp
     app.register_blueprint(auth_bp)
     app.register_blueprint(skills_bp)
+    app.register_blueprint(relationships_bp)
 
     @app.route("/api/health")
     def health():
