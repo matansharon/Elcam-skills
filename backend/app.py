@@ -74,8 +74,32 @@ def create_app(config_overrides=None):
 
     with app.app_context():
         db.create_all()
+        _migrate_schema()
 
     return app
+
+
+def _migrate_schema():
+    """Add columns introduced after a database was first created.
+
+    db.create_all() never alters existing tables, so databases from before
+    the .skill upload feature lack the package columns on skill_versions.
+    """
+    existing = {
+        row[1]
+        for row in db.session.execute(db.text("PRAGMA table_info(skill_versions)"))
+    }
+    additions = {
+        "package_blob": "BLOB",
+        "package_filename": "VARCHAR(255)",
+        "bundled_files": "JSON",
+    }
+    for column, ddl_type in additions.items():
+        if column not in existing:
+            db.session.execute(
+                db.text(f"ALTER TABLE skill_versions ADD COLUMN {column} {ddl_type}")
+            )
+    db.session.commit()
 
 
 if __name__ == "__main__":

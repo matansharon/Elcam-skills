@@ -26,6 +26,15 @@ session-cookie auth via Flask-Login · Cytoscape.js graph.
   neighbor highlighting.
 - **Dashboard** — searchable, filterable skill table (name/description search;
   status, category, owner, tag filters).
+- **.skill package upload** — create a skill (or publish a new version of an
+  existing one) by uploading a `.skill` file instead of writing markdown. A
+  `.skill` file is a ZIP containing `SKILL.md` (YAML frontmatter with `name` +
+  `description`, then the markdown body) plus optional bundled resources
+  (`scripts/`, `references/`, …). The upload modal previews the parsed package
+  before creating; the original archive is stored on the version it created,
+  its bundled files are listed on the detail page, and it can be re-downloaded
+  from the version history (doubles as export). Manual authoring still works —
+  both paths coexist.
 
 ## Setup
 
@@ -89,7 +98,11 @@ Six tables (SQLite via SQLAlchemy, `backend/models.py`):
   Deleting a skill cascades to everything below.
 - **SkillVersion** — immutable snapshot per save: per-skill version number,
   all metadata fields + markdown content, change note, author, timestamp.
-  Restore copies an old snapshot into a new version.
+  Restore copies an old snapshot into a new version. Versions created from an
+  uploaded `.skill` package also store the original archive bytes, its
+  filename, and the list of bundled file paths (`backend/packages.py` parses
+  uploads in memory; startup adds these columns to older databases
+  automatically).
 - **SkillPermission** — (user, skill) → `read`/`edit`. No row = no access.
   Admins and the skill's owner implicitly have edit.
 - **SkillRelationship** — directed typed edge (source, target, type), unique
@@ -107,5 +120,5 @@ Six tables (SQLite via SQLAlchemy, `backend/models.py`):
   backend change.
 - **API transport** is a single module (`frontend/src/api/client.js`).
 
-Design spec: `docs/superpowers/specs/2026-07-12-skill-registry-design.md`
-Implementation plan: `docs/superpowers/plans/2026-07-12-skill-registry-mvp.md`
+Design specs: `docs/superpowers/specs/`
+Implementation plans: `docs/superpowers/plans/`

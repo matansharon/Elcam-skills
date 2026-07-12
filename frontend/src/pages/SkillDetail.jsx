@@ -19,6 +19,7 @@ export default function SkillDetail() {
   const { user } = useAuth()
   const [skill, setSkill] = useState(null)
   const [content, setContent] = useState('')
+  const [latestVersion, setLatestVersion] = useState(null)
   const [versions, setVersions] = useState([])
   const [links, setLinks] = useState({ outgoing: [], incoming: [] })
   const [audit, setAudit] = useState([])
@@ -41,6 +42,7 @@ export default function SkillDetail() {
       if (vs.length) {
         const latest = await api.get(`/api/skills/${id}/versions/${vs[0].version_number}`)
         setContent(latest.content)
+        setLatestVersion(latest)
       }
       setError(null)
     } catch (e) {
@@ -118,6 +120,14 @@ export default function SkillDetail() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
+          {latestVersion?.has_package && (
+            <a
+              className="btn btn-ghost"
+              href={`/api/skills/${id}/versions/${latestVersion.version_number}/package`}
+            >
+              ⬇ Download .skill
+            </a>
+          )}
           {canEdit && (
             <button className="btn btn-primary" onClick={() => setShowEdit(true)}>
               Edit
@@ -145,9 +155,23 @@ export default function SkillDetail() {
         </div>
         <div className="panel">
           {tab === 'Content' && (
-            <div className="md-body">
-              {content ? <ReactMarkdown>{content}</ReactMarkdown> : (
-                <div className="cell-muted">No content yet.</div>
+            <div>
+              <div className="md-body">
+                {content ? <ReactMarkdown>{content}</ReactMarkdown> : (
+                  <div className="cell-muted">No content yet.</div>
+                )}
+              </div>
+              {latestVersion?.bundled_files?.length > 0 && (
+                <div className="bundled-files">
+                  <h3 style={{ fontSize: 14, marginBottom: 8 }}>Bundled files</h3>
+                  <div className="upload-preview-files">
+                    {latestVersion.bundled_files.map((f) => (
+                      <span key={f} className="chip mono">
+                        {f}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           )}
@@ -167,9 +191,11 @@ export default function SkillDetail() {
           {tab === 'History' && (
             <VersionHistory
               skillId={id}
+              skillName={skill.name}
               versions={versions}
               canEdit={canEdit}
               onRestore={restoreVersion}
+              onUploaded={load}
             />
           )}
 

@@ -121,6 +121,37 @@ def create_skill(user, data):
     return skill
 
 
+def create_skill_from_package(user, parsed, file_bytes, filename,
+                              category="", tags=None, status="draft"):
+    """Create a skill from a parsed .skill package; the archive is stored
+    on version 1. Name/description/content come from the package; the
+    caller supplies the rest."""
+    name = parsed["name"]
+    if Skill.query.filter_by(name=name).first():
+        abort(400, description="A skill with this name already exists")
+
+    skill = Skill(
+        name=name,
+        description=parsed["description"],
+        owner_id=user.id,
+        category=(category or "").strip(),
+        tags=_clean_tags(tags),
+        status=_validate_status(status or "draft"),
+    )
+    db.session.add(skill)
+    db.session.flush()
+
+    version = _snapshot(skill, user, parsed["content"],
+                        change_note=f"Uploaded package '{filename}'")
+    version.package_blob = file_bytes
+    version.package_filename = filename
+    version.bundled_files = parsed["bundled_files"]
+    log_action(skill.id, user.id, "create",
+               f"Created skill '{name}' from package '{filename}'")
+    db.session.commit()
+    return skill
+
+
 def update_skill(user, skill, data):
     name = (data.get("name") or skill.name).strip()
     if name != skill.name and Skill.query.filter_by(name=name).first():
@@ -147,6 +178,27 @@ def update_skill(user, skill, data):
     version = _snapshot(skill, user, content, data.get("change_note", ""))
     log_action(skill.id, user.id, "update",
                f"Saved version {version.version_number}")
+    db.session.commit()
+    return version
+
+
+def create_version_from_package(user, skill, parsed, file_bytes, filename,
+                                change_note=""):
+    """Publish a parsed .skill package as the skill's next version.
+
+    Content and description come from the package; name, category, tags,
+    and status stay untouched (renaming remains a deliberate manual edit).
+    """
+    skill.description = parsed["description"]
+    skill.updated_at = utcnow()
+
+    version = _snapshot(skill, user, parsed["content"],
+                        change_note or f"Uploaded package '{filename}'")
+    version.package_blob = file_bytes
+    version.package_filename = filename
+    version.bundled_files = parsed["bundled_files"]
+    log_action(skill.id, user.id, "upload",
+               f"Uploaded package '{filename}' as version {version.version_number}")
     db.session.commit()
     return version
 

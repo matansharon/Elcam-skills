@@ -1,10 +1,15 @@
 """Skills blueprint: CRUD with RBAC filtering and automatic versioning."""
-from flask import Blueprint, jsonify, request
+import io
+
+from flask import Blueprint, abort, jsonify, request, send_file
 from flask_login import current_user, login_required
 
 from models import AuditLog, SkillVersion
+from packages import parse_package
 from services import (
     create_skill,
+    create_skill_from_package,
+    create_version_from_package,
     delete_skill,
     get_permission_level,
     get_visible_skill_or_404,
@@ -13,6 +18,14 @@ from services import (
     update_skill,
     visible_skills,
 )
+
+
+def _read_upload():
+    """Pull the uploaded .skill file out of the multipart form."""
+    file = request.files.get("file")
+    if file is None or not file.filename:
+        abort(400, description="A .skill file is required")
+    return file.read(), file.filename
 
 skills_bp = Blueprint("skills", __name__, url_prefix="/api/skills")
 
@@ -52,6 +65,24 @@ def create():
     return jsonify(skill.to_dict(my_permission="edit")), 201
 
 
+@skills_bp.post("/upload")
+@login_required
+def upload_create():
+    file_bytes, filename = _read_upload()
+    parsed = parse_package(file_bytes)
+    if request.form.get("dry_run"):
+        return jsonify(parsed)
+
+    tags = [t.strip() for t in request.form.get("tags", "").split(",") if t.strip()]
+    skill = create_skill_from_package(
+        current_user, parsed, file_bytes, filename,
+        category=request.form.get("category", ""),
+        tags=tags,
+        status=request.form.get("status", "draft"),
+    )
+    return jsonify(skill.to_dict(my_permission="edit")), 201
+
+
 @skills_bp.get("/<int:skill_id>")
 @login_required
 def get_skill(skill_id):
@@ -80,6 +111,20 @@ def delete(skill_id):
     return jsonify({"status": "deleted"})
 
 
+@skills_bp.post("/<int:skill_id>/upload")
+@login_required
+def upload_version(skill_id):
+    skill = get_visible_skill_or_404(current_user, skill_id)
+    require_edit(current_user, skill)
+    file_bytes, filename = _read_upload()
+    parsed = parse_package(file_bytes)
+    version = create_version_from_package(
+        current_user, skill, parsed, file_bytes, filename,
+        change_note=request.form.get("change_note", ""),
+    )
+    return jsonify(version.to_dict())
+
+
 @skills_bp.get("/<int:skill_id>/versions")
 @login_required
 def list_versions(skill_id):
@@ -96,6 +141,21 @@ def get_version(skill_id, version_number):
     if version is None:
         return jsonify({"error": "Version not found"}), 404
     return jsonify(version.to_dict())
+
+
+@skills_bp.get("/<int:skill_id>/versions/<int:version_number>/package")
+@login_required
+def download_package(skill_id, version_number):
+    skill = get_visible_skill_or_404(current_user, skill_id)
+    version = skill.versions.filter_by(version_number=version_number).first()
+    if version is None or version.package_blob is None:
+        abort(404, description="No package for this version")
+    return send_file(
+        io.BytesIO(version.package_blob),
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=version.package_filename or f"{skill.name}.skill",
+    )
 
 
 @skills_bp.post("/<int:skill_id>/versions/<int:version_number>/restore")
