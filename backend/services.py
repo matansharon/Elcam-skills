@@ -182,6 +182,27 @@ def update_skill(user, skill, data):
     return version
 
 
+def create_version_from_package(user, skill, parsed, file_bytes, filename,
+                                change_note=""):
+    """Publish a parsed .skill package as the skill's next version.
+
+    Content and description come from the package; name, category, tags,
+    and status stay untouched (renaming remains a deliberate manual edit).
+    """
+    skill.description = parsed["description"]
+    skill.updated_at = utcnow()
+
+    version = _snapshot(skill, user, parsed["content"],
+                        change_note or f"Uploaded package '{filename}'")
+    version.package_blob = file_bytes
+    version.package_filename = filename
+    version.bundled_files = parsed["bundled_files"]
+    log_action(skill.id, user.id, "upload",
+               f"Uploaded package '{filename}' as version {version.version_number}")
+    db.session.commit()
+    return version
+
+
 def restore_version(user, skill, version_number):
     old = SkillVersion.query.filter_by(
         skill_id=skill.id, version_number=version_number

@@ -7,6 +7,7 @@ from packages import parse_package
 from services import (
     create_skill,
     create_skill_from_package,
+    create_version_from_package,
     delete_skill,
     get_permission_level,
     get_visible_skill_or_404,
@@ -106,6 +107,20 @@ def delete(skill_id):
     skill = get_visible_skill_or_404(current_user, skill_id)
     delete_skill(current_user, skill)
     return jsonify({"status": "deleted"})
+
+
+@skills_bp.post("/<int:skill_id>/upload")
+@login_required
+def upload_version(skill_id):
+    skill = get_visible_skill_or_404(current_user, skill_id)
+    require_edit(current_user, skill)
+    file_bytes, filename = _read_upload()
+    parsed = parse_package(file_bytes)
+    version = create_version_from_package(
+        current_user, skill, parsed, file_bytes, filename,
+        change_note=request.form.get("change_note", ""),
+    )
+    return jsonify(version.to_dict())
 
 
 @skills_bp.get("/<int:skill_id>/versions")

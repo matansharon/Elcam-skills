@@ -156,3 +156,67 @@ def test_upload_rejects_oversized_file(client, admin_user, login):
     resp = upload(client, b"x" * (20 * 1024 * 1024 + 1))
     assert resp.status_code == 400
     assert "large" in resp.get_json()["error"].lower()
+
+
+# --- Task 3: upload a package as a new version -------------------------------
+
+def upload_version(client, skill_id, blob, filename="update.skill", **form):
+    data = {"file": (io.BytesIO(blob), filename), **form}
+    return client.post(f"/api/skills/{skill_id}/upload", data=data,
+                       content_type="multipart/form-data")
+
+
+def test_upload_new_version_from_package(client, admin_user, make_skill, login):
+    skill_id = make_skill(admin_user, "Existing Skill",
+                          category="ops", tags=["a"], status="active")
+    login(admin_user)
+    blob = make_package("whatever-name", "New description from package",
+                        "# Updated body")
+    resp = upload_version(client, skill_id, blob, filename="v2.skill")
+    assert resp.status_code == 200, resp.get_json()
+    v2 = resp.get_json()
+    assert v2["version_number"] == 2
+    assert v2["has_package"] is True
+    assert v2["package_filename"] == "v2.skill"
+    assert v2["change_note"] == "Uploaded package 'v2.skill'"
+
+    # content + description come from the package; identity fields do not
+    skill = client.get(f"/api/skills/{skill_id}").get_json()
+    assert skill["name"] == "Existing Skill"
+    assert skill["description"] == "New description from package"
+    assert skill["category"] == "ops"
+    assert skill["tags"] == ["a"]
+    assert skill["status"] == "active"
+    assert skill["current_version"] == 2
+
+    full = client.get(f"/api/skills/{skill_id}/versions/2").get_json()
+    assert full["content"].startswith("# Updated body")
+
+    audit = client.get(f"/api/skills/{skill_id}/audit").get_json()
+    assert any(e["action"] == "upload" for e in audit)
+
+
+def test_upload_new_version_custom_change_note(client, admin_user, make_skill, login):
+    skill_id = make_skill(admin_user, "Noted Skill")
+    login(admin_user)
+    blob = make_package("x", "d", "b")
+    resp = upload_version(client, skill_id, blob, change_note="big rework")
+    assert resp.status_code == 200
+    assert resp.get_json()["change_note"] == "big rework"
+
+
+def test_upload_new_version_requires_edit(client, admin_user, regular_user,
+                                          make_skill, grant, login):
+    skill_id = make_skill(admin_user, "Read Only Skill")
+    grant(regular_user, skill_id, "read")
+    login(regular_user)
+    resp = upload_version(client, skill_id, make_package("x", "d", "b"))
+    assert resp.status_code == 403
+
+
+def test_upload_new_version_invisible_skill_is_404(client, admin_user,
+                                                   regular_user, make_skill, login):
+    skill_id = make_skill(admin_user, "Hidden Skill")
+    login(regular_user)
+    resp = upload_version(client, skill_id, make_package("x", "d", "b"))
+    assert resp.status_code == 404
