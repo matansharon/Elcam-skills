@@ -9,3 +9,4 @@ frontend/dist/
 .env
 *.log
 .playwright-mcp/
+graph-*.png
