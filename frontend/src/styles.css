@@ -867,3 +867,9 @@ table.data td.cell-muted {
 .package-chip:hover {
   border-color: var(--accent);
 }
+
+.bundled-files {
+  border-top: 1px dashed var(--line);
+  margin-top: 20px;
+  padding-top: 14px;
+}

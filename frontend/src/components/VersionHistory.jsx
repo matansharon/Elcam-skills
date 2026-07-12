@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import DiffView from './DiffView'
+import UploadVersionModal from './UploadVersionModal'
 
-export default function VersionHistory({ skillId, versions, canEdit, onRestore }) {
+export default function VersionHistory({ skillId, skillName, versions, canEdit, onRestore, onUploaded }) {
+  const [showUpload, setShowUpload] = useState(false)
   const numbers = versions.map((v) => v.version_number)
   const latest = numbers[0]
   const [from, setFrom] = useState(numbers[1] ?? latest)
@@ -30,6 +32,14 @@ export default function VersionHistory({ skillId, versions, canEdit, onRestore }
   return (
     <div>
       {error && <div className="banner banner-error">{error}</div>}
+
+      {canEdit && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+          <button className="btn btn-ghost btn-small" onClick={() => setShowUpload(true)}>
+            ⬆ Upload new version
+          </button>
+        </div>
+      )}
 
       {versions.length > 1 && (
         <div className="toolbar" style={{ borderBottom: 'none', paddingLeft: 0 }}>
@@ -65,6 +75,15 @@ export default function VersionHistory({ skillId, versions, canEdit, onRestore }
               {' · '}
               {v.created_by} · {new Date(v.created_at).toLocaleString()}
             </span>
+            {v.has_package && (
+              <a
+                className="package-chip"
+                href={`/api/skills/${skillId}/versions/${v.version_number}/package`}
+                title="Download the original .skill package"
+              >
+                ⬇ {v.package_filename || 'package.skill'}
+              </a>
+            )}
             {canEdit && v.version_number !== latest && (
               <button className="btn btn-ghost btn-small" onClick={() => restore(v.version_number)}>
                 Restore
@@ -73,6 +92,18 @@ export default function VersionHistory({ skillId, versions, canEdit, onRestore }
           </div>
         ))}
       </div>
+
+      {showUpload && (
+        <UploadVersionModal
+          skillId={skillId}
+          skillName={skillName}
+          onUploaded={() => {
+            setShowUpload(false)
+            onUploaded()
+          }}
+          onClose={() => setShowUpload(false)}
+        />
+      )}
     </div>
   )
 }
