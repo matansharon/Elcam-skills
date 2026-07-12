@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+backend/skills.db
+backend/instance/
+frontend/node_modules/
+frontend/dist/
+.env
+*.log
+.playwright-mcp/
