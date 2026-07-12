@@ -27,10 +27,10 @@
 **Interfaces:**
 - Produces: `SkillVersion.package_blob/package_filename/bundled_files` columns; `to_dict()` keys `has_package`, `package_filename`, `bundled_files`.
 
-- [ ] Add `pyyaml>=6.0` to requirements; `pip install`
-- [ ] Failing test: version dict of a manual skill has `has_package: False`, `bundled_files: []`
-- [ ] Add the three nullable columns + to_dict keys; startup PRAGMA/ALTER migration in `create_app`
-- [ ] Tests pass; commit
+- [x] Add `pyyaml>=6.0` to requirements; `pip install`
+- [x] Failing test: version dict of a manual skill has `has_package: False`, `bundled_files: []`
+- [x] Add the three nullable columns + to_dict keys; startup PRAGMA/ALTER migration in `create_app`
+- [x] Tests pass; commit
 
 ### Task 2: Parser + `POST /api/skills/upload` (create + dry_run + rejections)
 
@@ -42,9 +42,9 @@
 **Interfaces:**
 - Produces: `parse_package(file_bytes, filename) -> {name, description, content, bundled_files}` (aborts 400 on invalid); `create_skill_from_package(user, parsed, file_bytes, filename, category, tags, status) -> Skill`; test helper `make_package(name, description, body, extra_files=None, root_dir=None) -> bytes`.
 
-- [ ] Failing tests: happy-path create (fields from frontmatter, v1 has package, audit `create` mentions package), root-level SKILL.md accepted, dry_run creates nothing, rejects non-zip / no SKILL.md / no frontmatter / no name / duplicate name / oversized (403 not needed here — login only)
-- [ ] Implement parser (size guards, SKILL.md discovery root or one dir deep, UTF-8, YAML frontmatter split) and endpoint (multipart `file`, form `category`/`tags` CSV/`status`/`dry_run`)
-- [ ] Tests pass; commit
+- [x] Failing tests: happy-path create (fields from frontmatter, v1 has package, audit `create` mentions package), root-level SKILL.md accepted, dry_run creates nothing, rejects non-zip / no SKILL.md / no frontmatter / no name / duplicate name / oversized (403 not needed here — login only)
+- [x] Implement parser (size guards, SKILL.md discovery root or one dir deep, UTF-8, YAML frontmatter split) and endpoint (multipart `file`, form `category`/`tags` CSV/`status`/`dry_run`)
+- [x] Tests pass; commit
 
 ### Task 3: `POST /api/skills/<id>/upload` — new version from package
 
@@ -55,9 +55,9 @@
 **Interfaces:**
 - Produces: `create_version_from_package(user, skill, parsed, file_bytes, filename, change_note="") -> SkillVersion` — sets description+content from package, leaves name/category/tags/status untouched, bumps `updated_at`, audit `upload`.
 
-- [ ] Failing tests: creates version N+1 with package attached; description/content updated; name/category/tags/status untouched; default change note `Uploaded package '<file>'`; 403 for read-only user; 404 for invisible skill
-- [ ] Implement service + endpoint
-- [ ] Tests pass; commit
+- [x] Failing tests: creates version N+1 with package attached; description/content updated; name/category/tags/status untouched; default change note `Uploaded package '<file>'`; 403 for read-only user; 404 for invisible skill
+- [x] Implement service + endpoint
+- [x] Tests pass; commit
 
 ### Task 4: `GET /api/skills/<id>/versions/<n>/package` — download
 
@@ -65,9 +65,9 @@
 - Modify: `backend/skills.py`
 - Test: `backend/tests/test_upload.py`
 
-- [ ] Failing tests: returns original bytes with `application/zip` + attachment filename; 404 for manual version, missing version, invisible skill
-- [ ] Implement with `send_file(BytesIO(...), as_attachment=True, download_name=...)`
-- [ ] Tests pass; full suite green; commit
+- [x] Failing tests: returns original bytes with `application/zip` + attachment filename; 404 for manual version, missing version, invisible skill
+- [x] Implement with `send_file(BytesIO(...), as_attachment=True, download_name=...)`
+- [x] Tests pass; full suite green; commit
 
 ### Task 5: Frontend — upload modal on dashboard
 
@@ -78,23 +78,23 @@
 **Interfaces:**
 - Produces: `api.upload(path, formData)` — fetch POST multipart, same ApiError handling; `<UploadSkillModal onCreated={skill=>...} onClose={...}/>`.
 
-- [ ] `api.upload` helper
-- [ ] UploadSkillModal: file input → dry-run preview (name, description, content snippet, bundled-file chips) → category/tags/status fields → create → `onCreated(skill)`
-- [ ] Dashboard: "Upload .skill" button opens it; navigate to new skill on success
-- [ ] `npm run build` green; commit
+- [x] `api.upload` helper
+- [x] UploadSkillModal: file input → dry-run preview (name, description, content snippet, bundled-file chips) → category/tags/status fields → create → `onCreated(skill)`
+- [x] Dashboard: "Upload .skill" button opens it; navigate to new skill on success
+- [x] `npm run build` green; commit
 
 ### Task 6: Frontend — upload new version, download links, bundled files
 
 **Files:**
 - Modify: `frontend/src/components/VersionHistory.jsx` (upload-new-version modal + package chips), `frontend/src/pages/SkillDetail.jsx` (Download .skill header button, bundled-files list under content), `frontend/src/styles.css`
 
-- [ ] VersionHistory: "Upload new version" button (canEdit) → modal (file + change note) → POST → `onUploaded()`; package chip `<a>` per version with `has_package`
-- [ ] SkillDetail: header "Download .skill" when latest has package; bundled files listed under Content tab
-- [ ] `npm run build` green; commit
+- [x] VersionHistory: "Upload new version" button (canEdit) → modal (file + change note) → POST → `onUploaded()`; package chip `<a>` per version with `has_package`
+- [x] SkillDetail: header "Download .skill" when latest has package; bundled files listed under Content tab
+- [x] `npm run build` green; commit
 
 ### Task 7: Docs, verification, merge
 
-- [ ] README: upload feature section + pyyaml note
-- [ ] Full pytest suite + `npm run build`
-- [ ] Browser E2E with the real `file-inventory-summary.skill`: upload-create, preview, new-version upload, download, read-only user sees no upload buttons
-- [ ] Merge branch to main (--no-ff), push
+- [x] README: upload feature section + pyyaml note
+- [x] Full pytest suite + `npm run build`
+- [x] Browser E2E with the real `file-inventory-summary.skill`: upload-create, preview, new-version upload, download, read-only user sees no upload buttons
+- [x] Merge branch to main (--no-ff), push
