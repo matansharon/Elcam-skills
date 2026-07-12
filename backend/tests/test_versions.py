@@ -58,6 +58,15 @@ def test_restore_creates_new_version(client, regular_user, login, make_skill):
     assert v2["content"] == "changed"
 
 
+def test_content_only_update_bumps_updated_at(client, regular_user, login, make_skill):
+    skill_id = make_skill(regular_user, "Timestamped", content="a")
+    login(regular_user)
+    before = client.get(f"/api/skills/{skill_id}").get_json()["updated_at"]
+    _update(client, skill_id, "b")
+    after = client.get(f"/api/skills/{skill_id}").get_json()["updated_at"]
+    assert after > before
+
+
 def test_read_user_can_view_but_not_restore(client, regular_user, second_user,
                                             login, make_skill, grant):
     skill_id = make_skill(regular_user, "Guarded")

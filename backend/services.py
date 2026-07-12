@@ -12,6 +12,7 @@ from models import (
     SkillPermission,
     SkillVersion,
     db,
+    utcnow,
 )
 
 
@@ -140,6 +141,9 @@ def update_skill(user, skill, data):
         current = latest_version(skill)
         content = current.content if current else ""
 
+    # Content-only saves leave the metadata columns untouched, so bump
+    # the timestamp explicitly rather than relying on onupdate.
+    skill.updated_at = utcnow()
     version = _snapshot(skill, user, content, data.get("change_note", ""))
     log_action(skill.id, user.id, "update",
                f"Saved version {version.version_number}")
@@ -165,6 +169,7 @@ def restore_version(user, skill, version_number):
     skill.category = old.category
     skill.tags = list(old.tags or [])
     skill.status = old.status
+    skill.updated_at = utcnow()
 
     version = _snapshot(skill, user, old.content,
                         f"Restored from version {version_number}")
