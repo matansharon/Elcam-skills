@@ -1,10 +1,14 @@
 """Application factory for the Skill Registry backend."""
 import os
 
-from flask import Flask, jsonify
+from flask import Flask, abort, jsonify, send_from_directory
 from flask_login import LoginManager
 
 from models import db, User
+
+DIST_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+)
 
 
 def create_app(config_overrides=None):
@@ -54,6 +58,19 @@ def create_app(config_overrides=None):
     @app.errorhandler(405)
     def method_not_allowed(e):
         return jsonify({"error": "Method not allowed"}), 405
+
+    @app.route("/")
+    @app.route("/<path:path>")
+    def spa(path=""):
+        """Serve the built frontend with SPA fallback (demo/production mode)."""
+        if path.startswith("api/"):
+            abort(404)
+        candidate = os.path.join(DIST_DIR, path)
+        if path and os.path.isfile(candidate):
+            return send_from_directory(DIST_DIR, path)
+        if os.path.isfile(os.path.join(DIST_DIR, "index.html")):
+            return send_from_directory(DIST_DIR, "index.html")
+        abort(404, description="Frontend build not found. Run: cd frontend && npm run build")
 
     with app.app_context():
         db.create_all()
