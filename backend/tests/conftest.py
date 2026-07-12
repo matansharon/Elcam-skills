@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 import pytest
 
 from app import create_app
-from models import db, User
+from models import db, SkillPermission, User
 
 
 @pytest.fixture()
@@ -45,6 +45,35 @@ def regular_user(app):
 @pytest.fixture()
 def second_user(app):
     return _create_user(app, "yossi", "yossi123", "user")
+
+
+@pytest.fixture()
+def make_skill(app):
+    def _make(owner, name, **kw):
+        from services import create_skill
+        with app.app_context():
+            user = db.session.get(User, owner["id"])
+            skill = create_skill(user, {
+                "name": name,
+                "description": kw.get("description", f"{name} description"),
+                "category": kw.get("category", "general"),
+                "tags": kw.get("tags", []),
+                "status": kw.get("status", "active"),
+                "content": kw.get("content", f"# {name}\n\nInitial content."),
+            })
+            return skill.id
+    return _make
+
+
+@pytest.fixture()
+def grant(app):
+    def _grant(user, skill_id, level):
+        with app.app_context():
+            db.session.add(
+                SkillPermission(user_id=user["id"], skill_id=skill_id, level=level)
+            )
+            db.session.commit()
+    return _grant
 
 
 @pytest.fixture()
