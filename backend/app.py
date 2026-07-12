@@ -29,9 +29,11 @@ def create_app(config_overrides=None):
     from auth import auth_bp
     from relationships import relationships_bp
     from skills import skills_bp
+    from users import users_bp
     app.register_blueprint(auth_bp)
     app.register_blueprint(skills_bp)
     app.register_blueprint(relationships_bp)
+    app.register_blueprint(users_bp)
 
     @app.route("/api/health")
     def health():
