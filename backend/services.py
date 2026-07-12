@@ -121,6 +121,37 @@ def create_skill(user, data):
     return skill
 
 
+def create_skill_from_package(user, parsed, file_bytes, filename,
+                              category="", tags=None, status="draft"):
+    """Create a skill from a parsed .skill package; the archive is stored
+    on version 1. Name/description/content come from the package; the
+    caller supplies the rest."""
+    name = parsed["name"]
+    if Skill.query.filter_by(name=name).first():
+        abort(400, description="A skill with this name already exists")
+
+    skill = Skill(
+        name=name,
+        description=parsed["description"],
+        owner_id=user.id,
+        category=(category or "").strip(),
+        tags=_clean_tags(tags),
+        status=_validate_status(status or "draft"),
+    )
+    db.session.add(skill)
+    db.session.flush()
+
+    version = _snapshot(skill, user, parsed["content"],
+                        change_note=f"Uploaded package '{filename}'")
+    version.package_blob = file_bytes
+    version.package_filename = filename
+    version.bundled_files = parsed["bundled_files"]
+    log_action(skill.id, user.id, "create",
+               f"Created skill '{name}' from package '{filename}'")
+    db.session.commit()
+    return skill
+
+
 def update_skill(user, skill, data):
     name = (data.get("name") or skill.name).strip()
     if name != skill.name and Skill.query.filter_by(name=name).first():

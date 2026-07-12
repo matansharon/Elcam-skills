@@ -1,10 +1,12 @@
 """Skills blueprint: CRUD with RBAC filtering and automatic versioning."""
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, abort, jsonify, request
 from flask_login import current_user, login_required
 
 from models import AuditLog, SkillVersion
+from packages import parse_package
 from services import (
     create_skill,
+    create_skill_from_package,
     delete_skill,
     get_permission_level,
     get_visible_skill_or_404,
@@ -13,6 +15,14 @@ from services import (
     update_skill,
     visible_skills,
 )
+
+
+def _read_upload():
+    """Pull the uploaded .skill file out of the multipart form."""
+    file = request.files.get("file")
+    if file is None or not file.filename:
+        abort(400, description="A .skill file is required")
+    return file.read(), file.filename
 
 skills_bp = Blueprint("skills", __name__, url_prefix="/api/skills")
 
@@ -49,6 +59,24 @@ def list_skills():
 @login_required
 def create():
     skill = create_skill(current_user, request.get_json(silent=True) or {})
+    return jsonify(skill.to_dict(my_permission="edit")), 201
+
+
+@skills_bp.post("/upload")
+@login_required
+def upload_create():
+    file_bytes, filename = _read_upload()
+    parsed = parse_package(file_bytes)
+    if request.form.get("dry_run"):
+        return jsonify(parsed)
+
+    tags = [t.strip() for t in request.form.get("tags", "").split(",") if t.strip()]
+    skill = create_skill_from_package(
+        current_user, parsed, file_bytes, filename,
+        category=request.form.get("category", ""),
+        tags=tags,
+        status=request.form.get("status", "draft"),
+    )
     return jsonify(skill.to_dict(my_permission="edit")), 201
 
 
