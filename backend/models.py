@@ -119,6 +119,10 @@ class SkillVersion(db.Model):
     change_note = db.Column(db.String(500), nullable=False, default="")
     created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+    # Set only on versions created from an uploaded .skill package.
+    package_blob = db.Column(db.LargeBinary, nullable=True)
+    package_filename = db.Column(db.String(255), nullable=True)
+    bundled_files = db.Column(db.JSON, nullable=True)
 
     author = db.relationship("User", foreign_keys=[created_by])
 
@@ -133,6 +137,9 @@ class SkillVersion(db.Model):
             "change_note": self.change_note,
             "created_by": self.author.display_name,
             "created_at": self.created_at.isoformat(),
+            "has_package": self.package_blob is not None,
+            "package_filename": self.package_filename,
+            "bundled_files": self.bundled_files or [],
         }
         if include_content:
             data["content"] = self.content
