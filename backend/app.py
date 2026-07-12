@@ -26,6 +26,9 @@ def create_app(config_overrides=None):
     def unauthorized():
         return jsonify({"error": "Authentication required"}), 401
 
+    from auth import auth_bp
+    app.register_blueprint(auth_bp)
+
     @app.route("/api/health")
     def health():
         return jsonify({"status": "ok"})
