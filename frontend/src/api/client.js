@@ -13,12 +13,7 @@ export function setOnUnauthorized(fn) {
   onUnauthorized = fn
 }
 
-async function request(method, path, body) {
-  const opts = { method, credentials: 'include', headers: {} }
-  if (body !== undefined) {
-    opts.headers['Content-Type'] = 'application/json'
-    opts.body = JSON.stringify(body)
-  }
+async function send(path, opts) {
   const resp = await fetch(path, opts)
   let data = null
   try {
@@ -33,9 +28,21 @@ async function request(method, path, body) {
   return data
 }
 
+async function request(method, path, body) {
+  const opts = { method, credentials: 'include', headers: {} }
+  if (body !== undefined) {
+    opts.headers['Content-Type'] = 'application/json'
+    opts.body = JSON.stringify(body)
+  }
+  return send(path, opts)
+}
+
 export const api = {
   get: (path) => request('GET', path),
   post: (path, body) => request('POST', path, body),
   put: (path, body) => request('PUT', path, body),
   del: (path) => request('DELETE', path),
+  // multipart POST — the browser sets the boundary header itself
+  upload: (path, formData) =>
+    send(path, { method: 'POST', credentials: 'include', body: formData }),
 }
