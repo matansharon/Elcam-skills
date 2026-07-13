@@ -59,6 +59,14 @@ def create_app(config_overrides=None):
     def method_not_allowed(e):
         return jsonify({"error": "Method not allowed"}), 405
 
+    @app.errorhandler(502)
+    def bad_gateway(e):
+        return jsonify({"error": getattr(e, "description", "Bad gateway")}), 502
+
+    @app.errorhandler(503)
+    def service_unavailable(e):
+        return jsonify({"error": getattr(e, "description", "Service unavailable")}), 503
+
     @app.route("/")
     @app.route("/<path:path>")
     def spa(path=""):

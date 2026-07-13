@@ -1,9 +1,11 @@
 """Skills blueprint: CRUD with RBAC filtering and automatic versioning."""
 import io
+import json
 
-from flask import Blueprint, abort, jsonify, request, send_file
+from flask import Blueprint, abort, current_app, jsonify, request, send_file
 from flask_login import current_user, login_required
 
+from analysis import analyze_skill, AnalysisError
 from models import AuditLog, SkillVersion
 from packages import parse_package
 from services import (
@@ -26,6 +28,27 @@ def _read_upload():
     if file is None or not file.filename:
         abort(400, description="A .skill file is required")
     return file.read(), file.filename
+
+
+def _parse_related_form(raw):
+    """Parse the optional `related` JSON string from a multipart upload."""
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except ValueError:
+        abort(400, description="Invalid 'related' field (must be JSON)")
+    if not isinstance(parsed, list):
+        abort(400, description="'related' must be a list")
+    return parsed
+
+
+def _anthropic_client():
+    """Construct a live Anthropic client. Imported lazily so the module loads
+    (and the 'not configured' path works) even if the SDK is absent."""
+    import anthropic
+    return anthropic.Anthropic(api_key=current_app.config["ANTHROPIC_API_KEY"])
+
 
 skills_bp = Blueprint("skills", __name__, url_prefix="/api/skills")
 
@@ -65,6 +88,37 @@ def create():
     return jsonify(skill.to_dict(my_permission="edit")), 201
 
 
+@skills_bp.post("/analyze")
+@login_required
+def analyze():
+    data = request.get_json(silent=True) or {}
+    content = (data.get("content") or "").strip()
+    description = (data.get("description") or "").strip()
+    if not content and not description:
+        abort(400, description="Nothing to analyze")
+    if not current_app.config.get("ANTHROPIC_API_KEY"):
+        abort(503, description="AI analysis is not configured")
+
+    candidates = [
+        {"id": s.id, "name": s.name, "description": s.description, "category": s.category}
+        for s in visible_skills(current_user)
+    ]
+    try:
+        result = analyze_skill(
+            _anthropic_client(),
+            current_app.config["ANALYSIS_MODEL"],
+            data.get("name", ""),
+            description,
+            content,
+            candidates,
+        )
+    except AnalysisError:
+        abort(502, description="AI analysis failed")
+    except Exception:
+        abort(502, description="AI analysis failed")
+    return jsonify(result)
+
+
 @skills_bp.post("/upload")
 @login_required
 def upload_create():
@@ -74,11 +128,13 @@ def upload_create():
         return jsonify(parsed)
 
     tags = [t.strip() for t in request.form.get("tags", "").split(",") if t.strip()]
+    related = _parse_related_form(request.form.get("related"))
     skill = create_skill_from_package(
         current_user, parsed, file_bytes, filename,
         category=request.form.get("category", ""),
         tags=tags,
         status=request.form.get("status", "draft"),
+        related=related,
     )
     return jsonify(skill.to_dict(my_permission="edit")), 201
 

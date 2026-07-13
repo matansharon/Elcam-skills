@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import UploadSkillForm from './UploadSkillForm'
+import SuggestButton from './SuggestButton'
+import RelatedSkillsPicker from './RelatedSkillsPicker'
 
 const EMPTY = {
   name: '',
@@ -31,6 +33,7 @@ export default function SkillFormModal({
   })
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [related, setRelated] = useState([])
 
   const set = (key) => (e) => setForm({ ...form, [key]: e.target.value })
 
@@ -51,11 +54,35 @@ export default function SkillFormModal({
         content: form.content,
       }
       if (showChangeNote) payload.change_note = form.change_note
+      if (uploadOption) {
+        payload.related = related.filter((r) => r.target_skill_id)
+      }
       await onSubmit(payload)
     } catch (err) {
       setError(err.message)
       setBusy(false)
     }
+  }
+
+  const applySuggestions = (s) => {
+    setForm((f) => ({
+      ...f,
+      category: s.category || f.category,
+      status: s.status || f.status,
+      tags: (s.tags && s.tags.length ? s.tags.join(', ') : f.tags),
+    }))
+    setRelated((prev) => {
+      const seen = new Set(prev.map((r) => `${r.target_skill_id}:${r.type}`))
+      const merged = [...prev]
+      for (const r of s.related || []) {
+        const key = `${r.skill_id}:${r.type}`
+        if (!seen.has(key)) {
+          seen.add(key)
+          merged.push({ target_skill_id: r.skill_id, type: r.type })
+        }
+      }
+      return merged
+    })
   }
 
   return (
@@ -87,6 +114,17 @@ export default function SkillFormModal({
         ) : (
           <form onSubmit={submit}>
             {error && <div className="banner banner-error">{error}</div>}
+            {uploadOption && (
+              <SuggestButton
+                getInput={() => ({
+                  name: form.name,
+                  description: form.description,
+                  content: form.content,
+                })}
+                onSuggestions={applySuggestions}
+                disabled={!form.content.trim() && !form.description.trim()}
+              />
+            )}
             <div className="field-row">
               <label className="field">
                 Name
@@ -119,6 +157,9 @@ export default function SkillFormModal({
                 </select>
               </label>
             </div>
+            {uploadOption && (
+              <RelatedSkillsPicker value={related} onChange={setRelated} />
+            )}
             <label className="field">
               Content (markdown)
               <textarea value={form.content} onChange={set('content')} />
