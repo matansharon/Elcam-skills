@@ -618,25 +618,11 @@ def test_panel_disabled_when_unconfigured():
     c = app.test_client()
     resp = c.post("/api/activity/login", json={"username": "owner", "password": "s3cret"})
     assert resp.status_code == 401
-
-
-def test_logs_endpoint_requires_panel_auth():
-    app = _panel_app()
-    c = app.test_client()
-    assert c.get("/api/activity/logs").status_code == 401
-    c.post("/api/activity/login", json={"username": "owner", "password": "s3cret"})
-    assert c.get("/api/activity/logs").status_code == 200
 ```
 
-Note: `test_logs_endpoint_requires_panel_auth` needs the `/logs` route, which is added in Task 6. Mark it `@pytest.mark.skip(reason="logs route added in Task 6")` now and remove the skip in Task 6, OR implement a minimal `/logs` stub here. This plan removes the skip in Task 6.
-
-Add at the top of the test file: `import pytest` and decorate that one test:
-
-```python
-@pytest.mark.skip(reason="logs route added in Task 6")
-def test_logs_endpoint_requires_panel_auth():
-    ...
-```
+Note: the `@activity_required` guard is exercised end-to-end in Task 6 (via
+`test_logs_endpoint_requires_panel_auth`), once a guarded route exists. Do
+not add a guard test here — there is no guarded route yet.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -741,11 +727,19 @@ git commit -m "feat: .env-gated activity panel login/logout/session"
 - Produces: `GET /api/activity/logs` → `{items: [ActivityLog.to_dict()], page, page_size, total}`. Query params: `page` (≥1, default 1), `page_size` (1..200, default 50), `actor`, `category`, `method`, `status` (int), `date_from`/`date_to` (ISO 8601), `q` (substring over path+summary), `view` (`raw` default | `readable` = only rows with a summary). Ordered newest-first. Invalid `status`/`page`/`page_size`/dates → 400.
 - Produces helpers used by later tasks: `_base_filtered_query()` (returns a filtered `ActivityLog` query honoring all filters except pagination), `_pagination()` → `(page, page_size)`.
 
-- [ ] **Step 1: Remove the skip and write filter tests**
+- [ ] **Step 1: Write the guard + filter tests**
 
-In `backend/tests/test_activity.py`, remove the `@pytest.mark.skip` from `test_logs_endpoint_requires_panel_auth`, and add:
+In `backend/tests/test_activity.py`, add:
 
 ```python
+def test_logs_endpoint_requires_panel_auth():
+    app = _panel_app()
+    c = app.test_client()
+    assert c.get("/api/activity/logs").status_code == 401
+    c.post("/api/activity/login", json={"username": "owner", "password": "s3cret"})
+    assert c.get("/api/activity/logs").status_code == 200
+
+
 def _seed_rows(app, rows):
     with app.app_context():
         for r in rows:
