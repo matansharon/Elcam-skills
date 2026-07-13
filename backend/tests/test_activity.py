@@ -381,3 +381,29 @@ def test_retention_cap_trims_oldest():
         c.get("/api/activity/session")
     with app.app_context():
         assert ActivityLog.query.count() <= 3
+
+
+def test_failed_create_does_not_persist_partial_skill(client, regular_user, login):
+    """A create that aborts mid-transaction must leave NO partial rows, and its
+    log entry must not carry the optimistic 'Created skill' summary."""
+    from models import Skill, AuditLog
+    login(regular_user)
+    resp = client.post("/api/skills", json={
+        "name": "PartialGhost",
+        "content": "x",
+        "related": [{"target_skill_id": 9999, "type": "not_a_real_type"}],
+    })
+    assert resp.status_code == 400
+    with client.application.app_context():
+        assert Skill.query.filter_by(name="PartialGhost").count() == 0
+        assert AuditLog.query.filter_by(action="create").count() == 0
+        row = ActivityLog.query.filter_by(method="POST", path="/api/skills").first()
+        assert row is not None and row.status_code == 400
+        assert row.summary is None
+        assert row.category is None
+
+
+def test_clear_requires_panel_auth():
+    app = _panel_app()
+    c = app.test_client()
+    assert c.post("/api/activity/clear").status_code == 401

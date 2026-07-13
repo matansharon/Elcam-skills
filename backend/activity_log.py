@@ -73,7 +73,18 @@ def record_request(response):
     start = getattr(g, "_activity_start", None)
     duration_ms = int((time.monotonic() - start) * 1000) if start is not None else 0
     user_id, actor = _resolve_actor()
+    summary = getattr(g, "activity_summary", None)
+    category = getattr(g, "activity_category", None)
+    # A failed request may carry an optimistic write-summary (log_action sets
+    # it before the operation commits). Drop those on error; auth/admin
+    # summaries are set deliberately on their own branches, so keep them.
+    if response.status_code >= 400 and category in ("skill", "permission", "relationship"):
+        summary = None
+        category = None
     try:
+        # Discard any uncommitted writes an aborted view left in the shared
+        # session, so logging never persists a half-built transaction.
+        db.session.rollback()
         db.session.add(ActivityLog(
             user_id=user_id,
             actor=actor,
@@ -82,8 +93,8 @@ def record_request(response):
             status_code=response.status_code,
             duration_ms=duration_ms,
             ip_address=request.remote_addr,
-            summary=getattr(g, "activity_summary", None),
-            category=getattr(g, "activity_category", None),
+            summary=summary,
+            category=category,
         ))
         db.session.commit()
         trim_activity_log()

@@ -22,8 +22,8 @@ def check_panel_credentials(username, password):
     cfg_pass = current_app.config.get("ADMIN_PANEL_PASSWORD")
     if not cfg_user or not cfg_pass:
         return False  # panel disabled until both are configured
-    user_ok = hmac.compare_digest(username, cfg_user)
-    pass_ok = hmac.compare_digest(password, cfg_pass)
+    user_ok = hmac.compare_digest(username.encode("utf-8"), cfg_user.encode("utf-8"))
+    pass_ok = hmac.compare_digest(password.encode("utf-8"), cfg_pass.encode("utf-8"))
     return user_ok and pass_ok
 
 
