@@ -65,6 +65,7 @@ export default function ActivityPanel({ onLogout }) {
     Object.entries(filters).forEach(([k, v]) => {
       if (v) params.set(k, v)
     })
+    if (view) params.set('view', view)
     const qs = params.toString()
     const a = document.createElement('a')
     a.href = `/api/activity/export.csv${qs ? `?${qs}` : ''}`
@@ -79,9 +80,12 @@ export default function ActivityPanel({ onLogout }) {
     setError(null)
     try {
       await activityApi.post('/api/activity/clear')
-      setPage(1)
-      await load()
       setRefreshTick((t) => t + 1)
+      if (page === 1) {
+        await load()
+      } else {
+        setPage(1)
+      }
     } catch (err) {
       setError(err.message)
     }
