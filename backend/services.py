@@ -16,14 +16,24 @@ from models import (
     db,
     utcnow,
 )
+from activity_log import set_activity_summary
 
 
 # --- audit -----------------------------------------------------------------
+
+def _category_for(action):
+    if action.startswith("permission"):
+        return "permission"
+    if action.startswith("relationship"):
+        return "relationship"
+    return "skill"
+
 
 def log_action(skill_id, user_id, action, detail=""):
     db.session.add(
         AuditLog(skill_id=skill_id, user_id=user_id, action=action, detail=detail)
     )
+    set_activity_summary(detail, _category_for(action))
 
 
 # --- permissions -----------------------------------------------------------

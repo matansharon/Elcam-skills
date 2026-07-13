@@ -77,3 +77,38 @@ def test_non_api_paths_are_not_logged(client):
     client.get("/")            # SPA route, not /api/*
     with client.application.app_context():
         assert ActivityLog.query.filter_by(path="/").count() == 0
+
+
+from models import AuditLog
+
+
+def test_skill_create_sets_readable_summary(client, regular_user, login):
+    login(regular_user)
+    resp = client.post("/api/skills", json={"name": "PDF Export", "content": "x"})
+    assert resp.status_code == 201
+    with client.application.app_context():
+        row = ActivityLog.query.filter_by(method="POST", path="/api/skills").first()
+        assert row.summary == "Created skill 'PDF Export'"
+        assert row.category == "skill"
+        # Regression: the per-skill audit trail still records the create.
+        assert AuditLog.query.filter_by(action="create").count() == 1
+
+
+def test_failed_login_is_logged_readably(client, admin_user):
+    client.post("/api/auth/login", json={"username": "admin", "password": "nope"})
+    with client.application.app_context():
+        row = ActivityLog.query.filter_by(path="/api/auth/login").first()
+        assert row.status_code == 401
+        assert row.category == "auth"
+        assert "Failed login" in row.summary
+        assert row.user_id is None
+
+
+def test_successful_login_is_logged(client, regular_user):
+    client.post("/api/auth/login", json={"username": "dana", "password": "dana123"})
+    with client.application.app_context():
+        row = ActivityLog.query.filter_by(path="/api/auth/login").first()
+        assert row.status_code == 200
+        assert row.category == "auth"
+        assert row.summary == "Signed in"
+        assert row.user_id == regular_user["id"]
