@@ -962,3 +962,4 @@ table.data td.cell-muted {
 .activity-chart { display: block; }
 .activity-bar { fill: #4f6df5; }
 .activity-bar-label { font-size: 9px; fill: var(--muted, #888); }
+.activity-auto { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }

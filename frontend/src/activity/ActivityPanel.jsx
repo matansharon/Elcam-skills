@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { activityApi } from './activityApi'
 import ActivityStats from './ActivityStats'
 
@@ -19,6 +19,9 @@ export default function ActivityPanel({ onLogout }) {
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [data, setData] = useState({ items: [], total: 0, page: 1, page_size: PAGE_SIZE })
   const [error, setError] = useState(null)
+  const [autoRefresh, setAutoRefresh] = useState(false)
+  const [refreshTick, setRefreshTick] = useState(0)
+  const timerRef = useRef(null)
 
   const load = useCallback(async () => {
     setError(null)
@@ -34,6 +37,15 @@ export default function ActivityPanel({ onLogout }) {
     load()
   }, [load])
 
+  useEffect(() => {
+    if (!autoRefresh) return undefined
+    timerRef.current = setInterval(() => {
+      load()
+      setRefreshTick((t) => t + 1)
+    }, 5000)
+    return () => clearInterval(timerRef.current)
+  }, [autoRefresh, load])
+
   const setFilter = (key) => (e) => {
     setPage(1)
     setFilters((f) => ({ ...f, [key]: e.target.value }))
@@ -46,6 +58,33 @@ export default function ActivityPanel({ onLogout }) {
       /* already gone */
     }
     onLogout()
+  }
+
+  const exportCsv = () => {
+    const params = new URLSearchParams()
+    Object.entries(filters).forEach(([k, v]) => {
+      if (v) params.set(k, v)
+    })
+    const qs = params.toString()
+    const a = document.createElement('a')
+    a.href = `/api/activity/export.csv${qs ? `?${qs}` : ''}`
+    a.download = 'activity-log.csv'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  }
+
+  const clearLog = async () => {
+    if (!window.confirm('Permanently delete all recorded activity? This cannot be undone.')) return
+    setError(null)
+    try {
+      await activityApi.post('/api/activity/clear')
+      setPage(1)
+      await load()
+      setRefreshTick((t) => t + 1)
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
   const totalPages = Math.max(1, Math.ceil(data.total / PAGE_SIZE))
@@ -64,7 +103,7 @@ export default function ActivityPanel({ onLogout }) {
 
       {error && <div className="banner banner-error">{error}</div>}
 
-      <ActivityStats filters={filters} refreshKey={`${view}-${page}`} />
+      <ActivityStats filters={filters} refreshKey={`${view}-${page}-${refreshTick}`} />
 
       <div className="card panel">
         <div className="activity-toolbar">
@@ -81,6 +120,12 @@ export default function ActivityPanel({ onLogout }) {
             >
               Readable
             </button>
+            <label className="activity-auto">
+              <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} />
+              Auto-refresh
+            </label>
+            <button className="btn btn-small btn-ghost" onClick={exportCsv}>Export CSV</button>
+            <button className="btn btn-small btn-danger" onClick={clearLog}>Clear log</button>
           </div>
           <div className="activity-filters">
             <input placeholder="Search path/summary" value={filters.q} onChange={setFilter('q')} />
