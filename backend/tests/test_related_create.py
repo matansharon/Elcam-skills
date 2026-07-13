@@ -1,6 +1,7 @@
 import json
 
 import pytest
+from werkzeug.exceptions import HTTPException
 
 from models import SkillRelationship, User, db
 from services import attach_related, create_skill
@@ -36,6 +37,15 @@ def test_manual_create_bad_type_rejected(client, admin_user, login, make_skill):
     assert resp.status_code == 400
 
 
+def test_manual_create_non_dict_related_rejected(client, admin_user, login):
+    login(admin_user)
+    resp = client.post("/api/skills", json={
+        "name": "Bad Related Shape", "description": "d", "content": "c",
+        "related": ["not-an-object"],
+    })
+    assert resp.status_code == 400
+
+
 def test_manual_create_invisible_target_rejected(
     client, admin_user, regular_user, login, make_skill
 ):
@@ -63,8 +73,9 @@ def test_attach_related_rejects_self_link(app, admin_user, make_skill):
         from models import Skill
         skill = db.session.get(Skill, sid)
         user = db.session.get(User, admin_user["id"])
-        with pytest.raises(Exception):  # aborts 400
+        with pytest.raises(HTTPException) as exc:
             attach_related(skill, user, [{"target_skill_id": sid, "type": "extends"}])
+        assert exc.value.code == 400
 
 
 def test_package_create_with_related(admin_user, login, client, make_skill, app):

@@ -106,6 +106,8 @@ def attach_related(skill, user, related):
     self-link, 404 on an invisible target; silently skips exact duplicates.
     """
     for entry in related or []:
+        if not isinstance(entry, dict):
+            abort(400, description="Each related entry must be an object")
         rel_type = entry.get("type")
         if rel_type not in RELATIONSHIP_TYPES:
             abort(400, description=f"Type must be one of: {', '.join(RELATIONSHIP_TYPES)}")
