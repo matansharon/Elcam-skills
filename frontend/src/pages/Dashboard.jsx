@@ -4,7 +4,6 @@ import { api } from '../api/client'
 import StatusBadge from '../components/StatusBadge'
 import TagChips from '../components/TagChips'
 import SkillFormModal from '../components/SkillFormModal'
-import UploadSkillModal from '../components/UploadSkillModal'
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -12,7 +11,6 @@ export default function Dashboard() {
   const [skills, setSkills] = useState(null)
   const [error, setError] = useState(null)
   const [showCreate, setShowCreate] = useState(false)
-  const [showUpload, setShowUpload] = useState(false)
 
   const [search, setSearch] = useState('')
   const [q, setQ] = useState('') // debounced
@@ -70,14 +68,9 @@ export default function Dashboard() {
             {skills ? `${skills.length} skill${skills.length === 1 ? '' : 's'} visible to you` : ' '}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn btn-ghost" onClick={() => setShowUpload(true)}>
-            ⬆ Upload .skill
-          </button>
-          <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-            + New Skill
-          </button>
-        </div>
+        <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+          + New Skill
+        </button>
       </div>
 
       {error && <div className="banner banner-error">{error}</div>}
@@ -172,15 +165,10 @@ export default function Dashboard() {
         <SkillFormModal
           title="New Skill"
           submitLabel="Create"
+          uploadOption
+          onUploaded={(skill) => navigate(`/skills/${skill.id}`)}
           onSubmit={createSkill}
           onClose={() => setShowCreate(false)}
-        />
-      )}
-
-      {showUpload && (
-        <UploadSkillModal
-          onCreated={(skill) => navigate(`/skills/${skill.id}`)}
-          onClose={() => setShowUpload(false)}
         />
       )}
     </div>
