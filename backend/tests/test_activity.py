@@ -353,3 +353,31 @@ def test_export_csv_requires_panel_auth():
     app = _panel_app()
     c = app.test_client()
     assert c.get("/api/activity/export.csv").status_code == 401
+
+
+def test_clear_empties_log_but_records_itself():
+    app, c = _authed_panel()
+    _seed_rows(app, [
+        {"actor": "a", "method": "GET", "path": f"/api/x/{i}", "status_code": 200}
+        for i in range(4)
+    ])
+    resp = c.post("/api/activity/clear")
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "cleared"
+    with app.app_context():
+        rows = ActivityLog.query.all()
+        # Only the clear action itself remains.
+        assert len(rows) == 1
+        assert rows[0].category == "admin"
+        assert "Cleared activity log" in rows[0].summary
+
+
+def test_retention_cap_trims_oldest():
+    app = _panel_app(ACTIVITY_LOG_MAX_ROWS=3)
+    c = app.test_client()
+    c.post("/api/activity/login", json={"username": "owner", "password": "s3cret"})
+    # Each authed request logs a row; after several, the table is capped at 3.
+    for _ in range(6):
+        c.get("/api/activity/session")
+    with app.app_context():
+        assert ActivityLog.query.count() <= 3

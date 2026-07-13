@@ -202,3 +202,12 @@ def export_csv():
 
     headers = {"Content-Disposition": "attachment; filename=activity-log.csv"}
     return Response(stream_with_context(generate()), mimetype="text/csv", headers=headers)
+
+
+@activity_bp.post("/clear")
+@activity_required
+def clear():
+    deleted = ActivityLog.query.delete()
+    db.session.commit()
+    set_activity_summary(f"Cleared activity log ({deleted} rows)", "admin")
+    return jsonify({"status": "cleared", "deleted": deleted})
