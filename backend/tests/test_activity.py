@@ -1,4 +1,5 @@
 from app import create_app
+from models import ActivityLog, db
 
 
 def _panel_app(**overrides):
@@ -25,3 +26,25 @@ def test_config_reads_panel_credentials():
     assert app.config["ADMIN_PANEL_USER"] == "owner"
     assert app.config["ADMIN_PANEL_PASSWORD"] == "s3cret"
     assert app.config["ACTIVITY_LOG_MAX_ROWS"] == 500
+
+
+def test_activitylog_to_dict_shape():
+    app = create_app({"TESTING": True, "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:"})
+    with app.app_context():
+        row = ActivityLog(
+            actor="dana", method="POST", path="/api/skills",
+            status_code=201, duration_ms=12, ip_address="127.0.0.1",
+            summary="Created skill 'X'", category="skill",
+        )
+        db.session.add(row)
+        db.session.commit()
+        d = row.to_dict()
+        assert d["actor"] == "dana"
+        assert d["method"] == "POST"
+        assert d["path"] == "/api/skills"
+        assert d["status_code"] == 201
+        assert d["duration_ms"] == 12
+        assert d["summary"] == "Created skill 'X'"
+        assert d["category"] == "skill"
+        assert d["user_id"] is None
+        assert "timestamp" in d and d["timestamp"].endswith(("+00:00", "Z")) or "T" in d["timestamp"]
