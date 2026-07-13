@@ -35,6 +35,13 @@ session-cookie auth via Flask-Login · Cytoscape.js graph.
   its bundled files are listed on the detail page, and it can be re-downloaded
   from the version history (doubles as export). Manual authoring still works —
   both paths coexist.
+- **AI-assisted suggestions** — an optional "✨ Suggest with AI" button on
+  both the manual and `.skill` upload create flows asks Claude to suggest a
+  category, status, and tags, plus a related-skills picker pre-populated with
+  candidate links (each with a suggested relationship type). Suggestions are
+  editable before saving, and picked related skills become typed
+  relationships on the new skill once it's created. The feature is optional —
+  see the setup note below.
 
 ## Setup
 
@@ -54,6 +61,12 @@ cd ..
 :: 3. Demo data
 .venv\Scripts\python.exe backend\seed.py --force
 ```
+
+To enable AI-assisted suggestions, copy `backend/.env.example` to
+`backend/.env` and set `ANTHROPIC_API_KEY` (optional `ANALYSIS_MODEL`,
+default `claude-sonnet-5`). Without a key, clicking "✨ Suggest with AI"
+reports that AI analysis is not configured, and everything else works as
+before.
 
 ## Running
 
