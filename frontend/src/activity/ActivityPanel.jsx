@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { activityApi } from './activityApi'
+import ActivityStats from './ActivityStats'
 
 const EMPTY_FILTERS = { actor: '', category: '', method: '', status: '', q: '' }
 const PAGE_SIZE = 50
@@ -62,6 +63,8 @@ export default function ActivityPanel({ onLogout }) {
       </div>
 
       {error && <div className="banner banner-error">{error}</div>}
+
+      <ActivityStats filters={filters} refreshKey={`${view}-${page}`} />
 
       <div className="card panel">
         <div className="activity-toolbar">

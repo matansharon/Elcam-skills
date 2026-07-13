@@ -954,3 +954,11 @@ table.data td.cell-muted {
   display: flex; align-items: center; gap: 14px; justify-content: flex-end;
   margin-top: 14px;
 }
+.activity-stats { margin-bottom: 16px; }
+.stat-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
+.stat-card { padding: 16px; }
+.stat-value { font-size: 26px; font-weight: 700; }
+.stat-label { color: var(--muted, #888); font-size: 13px; margin-top: 4px; }
+.activity-chart { display: block; }
+.activity-bar { fill: #4f6df5; }
+.activity-bar-label { font-size: 9px; fill: var(--muted, #888); }
