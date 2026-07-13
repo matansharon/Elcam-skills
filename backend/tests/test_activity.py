@@ -139,3 +139,75 @@ def test_panel_disabled_when_unconfigured():
     c = app.test_client()
     resp = c.post("/api/activity/login", json={"username": "owner", "password": "s3cret"})
     assert resp.status_code == 401
+
+
+def test_logs_endpoint_requires_panel_auth():
+    app = _panel_app()
+    c = app.test_client()
+    assert c.get("/api/activity/logs").status_code == 401
+    c.post("/api/activity/login", json={"username": "owner", "password": "s3cret"})
+    assert c.get("/api/activity/logs").status_code == 200
+
+
+def _seed_rows(app, rows):
+    with app.app_context():
+        for r in rows:
+            db.session.add(ActivityLog(**r))
+        db.session.commit()
+
+
+def _authed_panel():
+    app = _panel_app()
+    c = app.test_client()
+    c.post("/api/activity/login", json={"username": "owner", "password": "s3cret"})
+    return app, c
+
+
+def test_logs_pagination_and_total():
+    app, c = _authed_panel()
+    _seed_rows(app, [
+        {"actor": "a", "method": "GET", "path": f"/api/x/{i}", "status_code": 200}
+        for i in range(5)
+    ])
+    resp = c.get("/api/activity/logs?page=1&page_size=2")
+    body = resp.get_json()
+    # total counts seeded rows plus the login row and this request is logged
+    # after the response, so it is not counted here.
+    assert body["page"] == 1 and body["page_size"] == 2
+    assert len(body["items"]) == 2
+    assert body["total"] >= 5
+
+
+def test_logs_filter_by_actor_and_category():
+    app, c = _authed_panel()
+    _seed_rows(app, [
+        {"actor": "dana", "method": "POST", "path": "/api/skills",
+         "status_code": 201, "summary": "Created skill 'X'", "category": "skill"},
+        {"actor": "amit", "method": "POST", "path": "/api/auth/login",
+         "status_code": 401, "summary": "Failed login for 'amit'", "category": "auth"},
+    ])
+    only_dana = c.get("/api/activity/logs?actor=dana").get_json()["items"]
+    assert all(r["actor"] == "dana" for r in only_dana)
+    only_auth = c.get("/api/activity/logs?category=auth").get_json()["items"]
+    assert all(r["category"] == "auth" for r in only_auth)
+
+
+def test_logs_view_readable_only_returns_rows_with_summary():
+    app, c = _authed_panel()
+    _seed_rows(app, [
+        {"actor": "a", "method": "GET", "path": "/api/skills", "status_code": 200},
+        {"actor": "a", "method": "POST", "path": "/api/skills", "status_code": 201,
+         "summary": "Created skill 'X'", "category": "skill"},
+    ])
+    items = c.get("/api/activity/logs?view=readable").get_json()["items"]
+    assert items and all(r["summary"] for r in items)
+
+
+def test_logs_text_search_and_bad_status():
+    app, c = _authed_panel()
+    _seed_rows(app, [
+        {"actor": "a", "method": "GET", "path": "/api/skills/42", "status_code": 200},
+    ])
+    found = c.get("/api/activity/logs?q=skills/42").get_json()["items"]
+    assert any("skills/42" in r["path"] for r in found)
+    assert c.get("/api/activity/logs?status=notanint").status_code == 400

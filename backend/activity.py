@@ -4,11 +4,13 @@ This gate is deliberately independent of Flask-Login: a DB admin gets no
 automatic access, and the panel admin needs no DB user.
 """
 import hmac
+from datetime import datetime
 from functools import wraps
 
-from flask import Blueprint, current_app, jsonify, request, session
+from flask import Blueprint, abort, current_app, jsonify, request, session
 
 from activity_log import set_activity_summary
+from models import ActivityLog, db
 
 activity_bp = Blueprint("activity", __name__, url_prefix="/api/activity")
 
@@ -55,3 +57,77 @@ def panel_logout():
 @activity_bp.get("/session")
 def panel_session():
     return jsonify({"authenticated": bool(session.get("activity_admin"))})
+
+
+def _parse_dt(value, field):
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        abort(400, description=f"Invalid {field} (use ISO 8601)")
+
+
+def _pagination():
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+    except (TypeError, ValueError):
+        abort(400, description="page must be an integer")
+    try:
+        page_size = int(request.args.get("page_size", 50))
+    except (TypeError, ValueError):
+        abort(400, description="page_size must be an integer")
+    return page, max(1, min(page_size, 200))
+
+
+def _base_filtered_query():
+    args = request.args
+    q = ActivityLog.query
+
+    actor = (args.get("actor") or "").strip()
+    category = (args.get("category") or "").strip()
+    method = (args.get("method") or "").strip().upper()
+    status = (args.get("status") or "").strip()
+    date_from = (args.get("date_from") or "").strip()
+    date_to = (args.get("date_to") or "").strip()
+    text = (args.get("q") or "").strip()
+    view = (args.get("view") or "").strip()
+
+    if actor:
+        q = q.filter(ActivityLog.actor == actor)
+    if category:
+        q = q.filter(ActivityLog.category == category)
+    if method:
+        q = q.filter(ActivityLog.method == method)
+    if status:
+        if not status.isdigit():
+            abort(400, description="status must be an integer")
+        q = q.filter(ActivityLog.status_code == int(status))
+    if date_from:
+        q = q.filter(ActivityLog.timestamp >= _parse_dt(date_from, "date_from"))
+    if date_to:
+        q = q.filter(ActivityLog.timestamp <= _parse_dt(date_to, "date_to"))
+    if text:
+        like = f"%{text}%"
+        q = q.filter(db.or_(ActivityLog.path.ilike(like), ActivityLog.summary.ilike(like)))
+    if view == "readable":
+        q = q.filter(ActivityLog.summary.isnot(None))
+    return q
+
+
+@activity_bp.get("/logs")
+@activity_required
+def logs():
+    page, page_size = _pagination()
+    q = _base_filtered_query()
+    total = q.count()
+    items = (
+        q.order_by(ActivityLog.timestamp.desc(), ActivityLog.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    return jsonify({
+        "items": [a.to_dict() for a in items],
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+    })
