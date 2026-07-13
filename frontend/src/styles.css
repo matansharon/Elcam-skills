@@ -940,3 +940,17 @@ table.data td.cell-muted {
 .related-row select {
   flex: 1;
 }
+
+/* Activity admin panel */
+.activity-shell { max-width: 1100px; margin: 0 auto; }
+.activity-toolbar {
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+  justify-content: space-between; margin-bottom: 14px;
+}
+.activity-toggle { display: flex; gap: 6px; }
+.activity-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.activity-filters input, .activity-filters select { padding: 6px 8px; }
+.activity-pager {
+  display: flex; align-items: center; gap: 14px; justify-content: flex-end;
+  margin-top: 14px;
+}
