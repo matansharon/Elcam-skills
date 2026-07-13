@@ -19,3 +19,16 @@ class Config:
     # AI-assisted skill analysis (optional; feature is inert without a key).
     ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
     ANALYSIS_MODEL = os.environ.get("ANALYSIS_MODEL", "claude-sonnet-5")
+
+    # Standalone activity-admin panel gate. When either is unset the panel
+    # is disabled (login always fails). Independent of the DB user table.
+    ADMIN_PANEL_USER = os.environ.get("ADMIN_PANEL_USER")
+    ADMIN_PANEL_PASSWORD = os.environ.get("ADMIN_PANEL_PASSWORD")
+
+    # Optional cap on stored activity rows; oldest are trimmed past it.
+    # Unset/blank means keep everything.
+    ACTIVITY_LOG_MAX_ROWS = (
+        int(os.environ["ACTIVITY_LOG_MAX_ROWS"])
+        if os.environ.get("ACTIVITY_LOG_MAX_ROWS")
+        else None
+    )
