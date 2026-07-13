@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { api } from '../api/client'
+import SuggestButton from './SuggestButton'
+import RelatedSkillsPicker from './RelatedSkillsPicker'
 
 // Create a skill from a .skill package. Name, description, and content come
 // from the package's SKILL.md (shown as a preview via a server-side dry run);
@@ -11,6 +13,7 @@ export default function UploadSkillForm({ onCreated, onClose }) {
   const [form, setForm] = useState({ category: '', tags: '', status: 'draft' })
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [related, setRelated] = useState([])
 
   const set = (key) => (e) => setForm({ ...form, [key]: e.target.value })
 
@@ -30,6 +33,27 @@ export default function UploadSkillForm({ onCreated, onClose }) {
     }
   }
 
+  const applySuggestions = (s) => {
+    setForm((f) => ({
+      ...f,
+      category: s.category || f.category,
+      status: s.status || f.status,
+      tags: (s.tags && s.tags.length ? s.tags.join(', ') : f.tags),
+    }))
+    setRelated((prev) => {
+      const seen = new Set(prev.map((r) => `${r.target_skill_id}:${r.type}`))
+      const merged = [...prev]
+      for (const r of s.related || []) {
+        const key = `${r.skill_id}:${r.type}`
+        if (!seen.has(key)) {
+          seen.add(key)
+          merged.push({ target_skill_id: r.skill_id, type: r.type })
+        }
+      }
+      return merged
+    })
+  }
+
   const submit = async (e) => {
     e.preventDefault()
     if (!file || !preview) return
@@ -41,6 +65,7 @@ export default function UploadSkillForm({ onCreated, onClose }) {
       fd.append('category', form.category)
       fd.append('tags', form.tags)
       fd.append('status', form.status)
+      fd.append('related', JSON.stringify(related.filter((r) => r.target_skill_id)))
       const skill = await api.upload('/api/skills/upload', fd)
       onCreated(skill)
     } catch (err) {
@@ -104,6 +129,16 @@ export default function UploadSkillForm({ onCreated, onClose }) {
             Tags (comma-separated)
             <input value={form.tags} onChange={set('tags')} placeholder="pdf, tables" />
           </label>
+          <SuggestButton
+            getInput={() => ({
+              name: preview.name,
+              description: preview.description,
+              content: preview.content,
+            })}
+            onSuggestions={applySuggestions}
+            disabled={!preview}
+          />
+          <RelatedSkillsPicker value={related} onChange={setRelated} />
         </>
       )}
 
