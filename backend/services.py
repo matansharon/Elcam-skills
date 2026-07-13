@@ -6,10 +6,12 @@ storage layer can be swapped without touching the API surface.
 from flask import abort
 
 from models import (
+    RELATIONSHIP_TYPES,
     STATUSES,
     AuditLog,
     Skill,
     SkillPermission,
+    SkillRelationship,
     SkillVersion,
     db,
     utcnow,
@@ -96,6 +98,36 @@ def latest_version(skill):
     )
 
 
+def attach_related(skill, user, related):
+    """Create typed relationships from `skill` to each listed target.
+
+    `related` is a list of {"target_skill_id": int, "type": str} (or None).
+    No commit — the caller owns the transaction. Aborts 400 on bad type or a
+    self-link, 404 on an invisible target; silently skips exact duplicates.
+    """
+    for entry in related or []:
+        rel_type = entry.get("type")
+        if rel_type not in RELATIONSHIP_TYPES:
+            abort(400, description=f"Type must be one of: {', '.join(RELATIONSHIP_TYPES)}")
+        target_id = entry.get("target_skill_id")
+        if target_id == skill.id:
+            abort(400, description="A skill cannot be linked to itself")
+        target = get_visible_skill_or_404(user, target_id)
+        exists = SkillRelationship.query.filter_by(
+            source_skill_id=skill.id, target_skill_id=target.id, type=rel_type
+        ).first()
+        if exists:
+            continue
+        db.session.add(SkillRelationship(
+            source_skill_id=skill.id,
+            target_skill_id=target.id,
+            type=rel_type,
+            created_by=user.id,
+        ))
+        log_action(skill.id, user.id, "relationship_added",
+                   f"{skill.name} {rel_type} {target.name}")
+
+
 def create_skill(user, data):
     name = (data.get("name") or "").strip()
     if not name:
@@ -117,12 +149,14 @@ def create_skill(user, data):
     _snapshot(skill, user, content=data.get("content", ""),
               change_note="Initial version")
     log_action(skill.id, user.id, "create", f"Created skill '{name}'")
+    attach_related(skill, user, data.get("related"))
     db.session.commit()
     return skill
 
 
 def create_skill_from_package(user, parsed, file_bytes, filename,
-                              category="", tags=None, status="draft"):
+                              category="", tags=None, status="draft",
+                              related=None):
     """Create a skill from a parsed .skill package; the archive is stored
     on version 1. Name/description/content come from the package; the
     caller supplies the rest."""
@@ -148,6 +182,7 @@ def create_skill_from_package(user, parsed, file_bytes, filename,
     version.bundled_files = parsed["bundled_files"]
     log_action(skill.id, user.id, "create",
                f"Created skill '{name}' from package '{filename}'")
+    attach_related(skill, user, related)
     db.session.commit()
     return skill
 

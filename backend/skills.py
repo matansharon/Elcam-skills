@@ -1,5 +1,6 @@
 """Skills blueprint: CRUD with RBAC filtering and automatic versioning."""
 import io
+import json
 
 from flask import Blueprint, abort, current_app, jsonify, request, send_file
 from flask_login import current_user, login_required
@@ -27,6 +28,19 @@ def _read_upload():
     if file is None or not file.filename:
         abort(400, description="A .skill file is required")
     return file.read(), file.filename
+
+
+def _parse_related_form(raw):
+    """Parse the optional `related` JSON string from a multipart upload."""
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except ValueError:
+        abort(400, description="Invalid 'related' field (must be JSON)")
+    if not isinstance(parsed, list):
+        abort(400, description="'related' must be a list")
+    return parsed
 
 
 def _anthropic_client():
@@ -114,11 +128,13 @@ def upload_create():
         return jsonify(parsed)
 
     tags = [t.strip() for t in request.form.get("tags", "").split(",") if t.strip()]
+    related = _parse_related_form(request.form.get("related"))
     skill = create_skill_from_package(
         current_user, parsed, file_bytes, filename,
         category=request.form.get("category", ""),
         tags=tags,
         status=request.form.get("status", "draft"),
+        related=related,
     )
     return jsonify(skill.to_dict(my_permission="edit")), 201
 
