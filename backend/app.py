@@ -39,6 +39,10 @@ def create_app(config_overrides=None):
     app.register_blueprint(relationships_bp)
     app.register_blueprint(users_bp)
 
+    from activity_log import record_request, start_timer
+    app.before_request(start_timer)
+    app.after_request(record_request)
+
     @app.route("/api/health")
     def health():
         return jsonify({"status": "ok"})

@@ -48,3 +48,32 @@ def test_activitylog_to_dict_shape():
         assert d["category"] == "skill"
         assert d["user_id"] is None
         assert "timestamp" in d and d["timestamp"].endswith(("+00:00", "Z")) or "T" in d["timestamp"]
+
+
+def test_request_is_logged_with_raw_fields(client, regular_user, login):
+    login(regular_user)
+    client.get("/api/skills")
+    with client.application.app_context():
+        rows = ActivityLog.query.filter_by(path="/api/skills", method="GET").all()
+        assert len(rows) == 1
+        row = rows[0]
+        assert row.actor == "Dana"          # display_name from conftest
+        assert row.user_id == regular_user["id"]
+        assert row.status_code == 200
+        assert row.duration_ms >= 0
+
+
+def test_anonymous_request_logs_anonymous_actor(client):
+    client.get("/api/skills")  # 401, not logged in
+    with client.application.app_context():
+        row = ActivityLog.query.filter_by(path="/api/skills").first()
+        assert row is not None
+        assert row.actor == "anonymous"
+        assert row.user_id is None
+        assert row.status_code == 401
+
+
+def test_non_api_paths_are_not_logged(client):
+    client.get("/")            # SPA route, not /api/*
+    with client.application.app_context():
+        assert ActivityLog.query.filter_by(path="/").count() == 0
