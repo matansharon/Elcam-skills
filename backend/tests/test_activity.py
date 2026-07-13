@@ -211,3 +211,91 @@ def test_logs_text_search_and_bad_status():
     found = c.get("/api/activity/logs?q=skills/42").get_json()["items"]
     assert any("skills/42" in r["path"] for r in found)
     assert c.get("/api/activity/logs?status=notanint").status_code == 400
+
+
+def test_logs_invalid_date_from():
+    app, c = _authed_panel()
+    resp = c.get("/api/activity/logs?date_from=notadate")
+    assert resp.status_code == 400
+
+
+def test_logs_invalid_date_to():
+    app, c = _authed_panel()
+    resp = c.get("/api/activity/logs?date_to=2026-13-99")
+    assert resp.status_code == 400
+
+
+def test_logs_q_matches_summary():
+    app, c = _authed_panel()
+    _seed_rows(app, [
+        {"actor": "a", "method": "POST", "path": "/api/skills",
+         "status_code": 201, "summary": "Created skill 'DataAnalyzer'"},
+    ])
+    # Search for a term in summary that is NOT in the path
+    found = c.get("/api/activity/logs?q=DataAnalyzer").get_json()["items"]
+    assert any("DataAnalyzer" in r["summary"] for r in found)
+
+
+def test_logs_method_filter_case_insensitive():
+    app, c = _authed_panel()
+    _seed_rows(app, [
+        {"actor": "a", "method": "POST", "path": "/api/x", "status_code": 201},
+        {"actor": "b", "method": "GET", "path": "/api/y", "status_code": 200},
+    ])
+    # Lowercase 'post' should match uppercase 'POST'
+    posts = c.get("/api/activity/logs?method=post").get_json()["items"]
+    assert all(r["method"] == "POST" for r in posts)
+    assert len(posts) > 0
+    # 'get' should not return POST rows
+    gets = c.get("/api/activity/logs?method=get").get_json()["items"]
+    assert not any(r["method"] == "POST" for r in gets)
+
+
+def test_logs_page_clamping():
+    app, c = _authed_panel()
+    _seed_rows(app, [
+        {"actor": "a", "method": "GET", "path": f"/api/x/{i}", "status_code": 200}
+        for i in range(5)
+    ])
+    # page=0 should be clamped to 1
+    resp = c.get("/api/activity/logs?page=0&page_size=2").get_json()
+    assert resp["page"] == 1
+    # page_size=500 should be clamped to 200
+    resp = c.get("/api/activity/logs?page_size=500").get_json()
+    assert resp["page_size"] == 200
+    # page_size=0 should be clamped to 1
+    resp = c.get("/api/activity/logs?page_size=0").get_json()
+    assert resp["page_size"] == 1
+
+
+def test_logs_non_integer_page_returns_400():
+    app, c = _authed_panel()
+    resp = c.get("/api/activity/logs?page=abc")
+    assert resp.status_code == 400
+
+
+def test_logs_non_integer_page_size_returns_400():
+    app, c = _authed_panel()
+    resp = c.get("/api/activity/logs?page_size=xyz")
+    assert resp.status_code == 400
+
+
+def test_logs_ordering_newest_first():
+    from datetime import datetime, timedelta
+    app, c = _authed_panel()
+    base_time = datetime(2026, 7, 13, 10, 0, 0)
+    _seed_rows(app, [
+        {"actor": "a", "method": "GET", "path": "/api/x/1", "status_code": 200,
+         "timestamp": base_time},
+        {"actor": "a", "method": "GET", "path": "/api/x/2", "status_code": 200,
+         "timestamp": base_time + timedelta(seconds=1)},
+        {"actor": "a", "method": "GET", "path": "/api/x/3", "status_code": 200,
+         "timestamp": base_time + timedelta(seconds=2)},
+    ])
+    items = c.get("/api/activity/logs?page_size=100").get_json()["items"]
+    # Find the seeded rows (path contains /api/x/)
+    seeded = [r for r in items if "/api/x/" in r["path"]]
+    # Last seeded row should come first (newest)
+    assert seeded[0]["path"] == "/api/x/3"
+    assert seeded[1]["path"] == "/api/x/2"
+    assert seeded[2]["path"] == "/api/x/1"
