@@ -112,3 +112,30 @@ def test_successful_login_is_logged(client, regular_user):
         assert row.category == "auth"
         assert row.summary == "Signed in"
         assert row.user_id == regular_user["id"]
+
+
+def test_panel_login_success_and_session():
+    app = _panel_app()
+    c = app.test_client()
+    assert c.get("/api/activity/session").get_json() == {"authenticated": False}
+    resp = c.post("/api/activity/login", json={"username": "owner", "password": "s3cret"})
+    assert resp.status_code == 200
+    assert resp.get_json()["authenticated"] is True
+    assert c.get("/api/activity/session").get_json() == {"authenticated": True}
+    c.post("/api/activity/logout")
+    assert c.get("/api/activity/session").get_json() == {"authenticated": False}
+
+
+def test_panel_login_wrong_password():
+    app = _panel_app()
+    c = app.test_client()
+    resp = c.post("/api/activity/login", json={"username": "owner", "password": "nope"})
+    assert resp.status_code == 401
+    assert c.get("/api/activity/session").get_json()["authenticated"] is False
+
+
+def test_panel_disabled_when_unconfigured():
+    app = create_app({"TESTING": True, "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:"})
+    c = app.test_client()
+    resp = c.post("/api/activity/login", json={"username": "owner", "password": "s3cret"})
+    assert resp.status_code == 401

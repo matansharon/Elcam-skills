@@ -30,10 +30,12 @@ def create_app(config_overrides=None):
     def unauthorized():
         return jsonify({"error": "Authentication required"}), 401
 
+    from activity import activity_bp
     from auth import auth_bp
     from relationships import relationships_bp
     from skills import skills_bp
     from users import users_bp
+    app.register_blueprint(activity_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(skills_bp)
     app.register_blueprint(relationships_bp)
