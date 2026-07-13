@@ -3,6 +3,7 @@ from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required, login_user, logout_user
 
 from models import User
+from activity_log import set_activity_summary
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
@@ -15,15 +16,18 @@ def login():
 
     user = User.query.filter_by(username=username).first()
     if user is None or not user.check_password(password):
+        set_activity_summary(f"Failed login for '{username}'", "auth")
         return jsonify({"error": "Invalid username or password"}), 401
 
     login_user(user)
+    set_activity_summary("Signed in", "auth")
     return jsonify(user.to_dict())
 
 
 @auth_bp.post("/logout")
 @login_required
 def logout():
+    set_activity_summary("Signed out", "auth")
     logout_user()
     return jsonify({"status": "ok"})
 

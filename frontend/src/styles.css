@@ -940,3 +940,26 @@ table.data td.cell-muted {
 .related-row select {
   flex: 1;
 }
+
+/* Activity admin panel */
+.activity-shell { max-width: 1100px; margin: 0 auto; }
+.activity-toolbar {
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+  justify-content: space-between; margin-bottom: 14px;
+}
+.activity-toggle { display: flex; gap: 6px; }
+.activity-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.activity-filters input, .activity-filters select { padding: 6px 8px; }
+.activity-pager {
+  display: flex; align-items: center; gap: 14px; justify-content: flex-end;
+  margin-top: 14px;
+}
+.activity-stats { margin-bottom: 16px; }
+.stat-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
+.stat-card { padding: 16px; }
+.stat-value { font-size: 26px; font-weight: 700; }
+.stat-label { color: var(--muted, #888); font-size: 13px; margin-top: 4px; }
+.activity-chart { display: block; }
+.activity-bar { fill: #4f6df5; }
+.activity-bar-label { font-size: 9px; fill: var(--muted, #888); }
+.activity-auto { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }

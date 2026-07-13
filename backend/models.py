@@ -200,3 +200,40 @@ class AuditLog(db.Model):
             "user": self.user.display_name if self.user else None,
             "created_at": self.created_at.isoformat(),
         }
+
+
+class ActivityLog(db.Model):
+    """Global, app-wide activity log: one row per API request.
+
+    Distinct from AuditLog (which is per-skill). `actor` is denormalized
+    because failed logins have no user and the .env panel admin is not a
+    DB row.
+    """
+    __tablename__ = "activity_log"
+
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, nullable=False, default=utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    actor = db.Column(db.String(120), nullable=False, default="anonymous")
+    method = db.Column(db.String(10), nullable=False)
+    path = db.Column(db.String(255), nullable=False)
+    status_code = db.Column(db.Integer, nullable=False)
+    duration_ms = db.Column(db.Integer, nullable=False, default=0)
+    ip_address = db.Column(db.String(45), nullable=True)
+    summary = db.Column(db.Text, nullable=True)
+    category = db.Column(db.String(20), nullable=True)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "timestamp": self.timestamp.isoformat(),
+            "user_id": self.user_id,
+            "actor": self.actor,
+            "method": self.method,
+            "path": self.path,
+            "status_code": self.status_code,
+            "duration_ms": self.duration_ms,
+            "ip_address": self.ip_address,
+            "summary": self.summary,
+            "category": self.category,
+        }

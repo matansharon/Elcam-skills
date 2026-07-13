@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard'
 import SkillDetail from './pages/SkillDetail'
 import GraphView from './pages/GraphView'
 import AdminPanel from './pages/AdminPanel'
+import ActivityPage from './activity/ActivityPage'
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
@@ -78,6 +79,7 @@ export default function App() {
           }
         />
       </Route>
+      <Route path="/activity" element={<ActivityPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
