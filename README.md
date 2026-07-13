@@ -68,6 +68,24 @@ default `claude-sonnet-5`). Without a key, clicking "✨ Suggest with AI"
 reports that AI analysis is not configured, and everything else works as
 before.
 
+## Activity admin panel
+
+A standalone console at `/activity` records every API operation (raw view)
+plus readable summaries of meaningful events (readable view). It is gated by a
+credential kept in `backend/.env`, independent of the app's user accounts:
+
+```
+ADMIN_PANEL_USER=owner
+ADMIN_PANEL_PASSWORD=choose-a-strong-password
+# optional: cap stored rows (oldest trimmed); blank keeps everything
+ACTIVITY_LOG_MAX_ROWS=
+```
+
+With both set, open `/activity`, sign in with those credentials, and browse,
+filter, search, export (CSV), or clear the log. When the vars are unset the
+panel is disabled (login always fails). The page is not linked from the main
+navigation and its login is separate from the regular user login.
+
 ## Running
 
 **Demo / single process** (Flask serves the built frontend):
