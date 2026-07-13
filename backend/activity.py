@@ -131,3 +131,38 @@ def logs():
         "page_size": page_size,
         "total": total,
     })
+
+
+@activity_bp.get("/stats")
+@activity_required
+def stats():
+    q = _base_filtered_query()
+    total = q.count()
+    active_users = q.with_entities(ActivityLog.actor).distinct().count()
+
+    by_category = (
+        q.with_entities(ActivityLog.category, db.func.count())
+        .group_by(ActivityLog.category)
+        .all()
+    )
+    by_method = (
+        q.with_entities(ActivityLog.method, db.func.count())
+        .group_by(ActivityLog.method)
+        .all()
+    )
+    day = db.func.strftime("%Y-%m-%d", ActivityLog.timestamp)
+    timeline = (
+        q.with_entities(day.label("bucket"), db.func.count())
+        .group_by("bucket")
+        .order_by("bucket")
+        .all()
+    )
+    return jsonify({
+        "total": total,
+        "active_users": active_users,
+        "by_category": [
+            {"category": c or "request", "count": n} for c, n in by_category
+        ],
+        "by_method": [{"method": m, "count": n} for m, n in by_method],
+        "timeline": [{"bucket": b, "count": n} for b, n in timeline],
+    })

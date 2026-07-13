@@ -299,3 +299,33 @@ def test_logs_ordering_newest_first():
     assert seeded[0]["path"] == "/api/x/3"
     assert seeded[1]["path"] == "/api/x/2"
     assert seeded[2]["path"] == "/api/x/1"
+
+
+def test_stats_shape_and_counts():
+    app, c = _authed_panel()
+    _seed_rows(app, [
+        {"actor": "dana", "method": "POST", "path": "/api/skills",
+         "status_code": 201, "summary": "Created skill 'X'", "category": "skill"},
+        {"actor": "dana", "method": "GET", "path": "/api/skills", "status_code": 200},
+        {"actor": "amit", "method": "GET", "path": "/api/skills", "status_code": 200},
+    ])
+    stats = c.get("/api/activity/stats").get_json()
+    assert stats["total"] >= 3
+    assert stats["active_users"] >= 2          # dana, amit (plus "owner" login row)
+    cats = {row["category"]: row["count"] for row in stats["by_category"]}
+    assert cats.get("skill", 0) >= 1
+    assert "request" in cats                    # the null-category GET rows
+    methods = {row["method"]: row["count"] for row in stats["by_method"]}
+    assert methods.get("GET", 0) >= 2
+    assert isinstance(stats["timeline"], list) and stats["timeline"]
+    assert set(stats["timeline"][0].keys()) == {"bucket", "count"}
+
+
+def test_stats_honors_actor_filter():
+    app, c = _authed_panel()
+    _seed_rows(app, [
+        {"actor": "dana", "method": "GET", "path": "/api/skills", "status_code": 200},
+        {"actor": "amit", "method": "GET", "path": "/api/skills", "status_code": 200},
+    ])
+    stats = c.get("/api/activity/stats?actor=dana").get_json()
+    assert stats["active_users"] == 1
