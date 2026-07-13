@@ -3,11 +3,13 @@
 This gate is deliberately independent of Flask-Login: a DB admin gets no
 automatic access, and the panel admin needs no DB user.
 """
+import csv
 import hmac
+import io
 from datetime import datetime
 from functools import wraps
 
-from flask import Blueprint, abort, current_app, jsonify, request, session
+from flask import Blueprint, Response, abort, current_app, jsonify, request, session, stream_with_context
 
 from activity_log import set_activity_summary
 from models import ActivityLog, db
@@ -166,3 +168,37 @@ def stats():
         "by_method": [{"method": m, "count": n} for m, n in by_method],
         "timeline": [{"bucket": b, "count": n} for b, n in timeline],
     })
+
+
+_CSV_COLUMNS = [
+    "timestamp", "actor", "method", "path", "status_code",
+    "duration_ms", "ip_address", "category", "summary",
+]
+
+
+@activity_bp.get("/export.csv")
+@activity_required
+def export_csv():
+    q = _base_filtered_query().order_by(
+        ActivityLog.timestamp.desc(), ActivityLog.id.desc()
+    )
+
+    def generate():
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(_CSV_COLUMNS)
+        yield buffer.getvalue()
+        buffer.seek(0)
+        buffer.truncate(0)
+        for a in q:
+            writer.writerow([
+                a.timestamp.isoformat(), a.actor, a.method, a.path,
+                a.status_code, a.duration_ms, a.ip_address or "",
+                a.category or "", a.summary or "",
+            ])
+            yield buffer.getvalue()
+            buffer.seek(0)
+            buffer.truncate(0)
+
+    headers = {"Content-Disposition": "attachment; filename=activity-log.csv"}
+    return Response(stream_with_context(generate()), mimetype="text/csv", headers=headers)

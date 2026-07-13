@@ -329,3 +329,27 @@ def test_stats_honors_actor_filter():
     ])
     stats = c.get("/api/activity/stats?actor=dana").get_json()
     assert stats["active_users"] == 1
+
+
+def test_export_csv_contains_rows_and_escapes():
+    app, c = _authed_panel()
+    _seed_rows(app, [
+        {"actor": "dana", "method": "POST", "path": "/api/skills", "status_code": 201,
+         "summary": 'Created skill "X, the great"', "category": "skill"},
+    ])
+    resp = c.get("/api/activity/export.csv")
+    assert resp.status_code == 200
+    assert resp.mimetype == "text/csv"
+    assert "attachment" in resp.headers["Content-Disposition"]
+    text = resp.get_data(as_text=True)
+    lines = text.splitlines()
+    assert lines[0] == "timestamp,actor,method,path,status_code,duration_ms,ip_address,category,summary"
+    # The comma-and-quote-bearing summary must be CSV-quoted, not split.
+    assert '"Created skill ""X, the great"""' in text
+    assert "dana" in text
+
+
+def test_export_csv_requires_panel_auth():
+    app = _panel_app()
+    c = app.test_client()
+    assert c.get("/api/activity/export.csv").status_code == 401
