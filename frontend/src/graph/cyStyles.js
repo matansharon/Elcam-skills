@@ -20,6 +20,23 @@ export const CATEGORY_PALETTE = [
 
 export const UNCATEGORIZED_COLOR = '#64748b'
 
+// Force-directed layout tuned for spread + overlap avoidance. Reused by the
+// initial render and the "re-spread" control.
+export const GRAPH_LAYOUT = {
+  name: 'fcose',
+  quality: 'proof',
+  randomize: true,
+  animate: true,
+  animationDuration: 450,
+  fit: true,
+  padding: 45,
+  nodeRepulsion: 9000,
+  idealEdgeLength: 130,
+  nodeSeparation: 90,
+  packComponents: true,
+  gravity: 0.25,
+}
+
 export function buildStylesheet() {
   return [
     {
@@ -30,10 +47,16 @@ export function buildStylesheet() {
         'font-family': 'IBM Plex Mono, monospace',
         'font-size': 11,
         'text-valign': 'bottom',
-        'text-margin-y': 7,
+        'text-margin-y': 6,
+        'text-wrap': 'wrap',
+        'text-max-width': '104px',
         color: '#14232b',
-        width: 34,
-        height: 34,
+        'text-background-color': '#ffffff',
+        'text-background-opacity': 0.85,
+        'text-background-padding': 3,
+        'text-background-shape': 'roundrectangle',
+        width: 'data(size)',
+        height: 'data(size)',
         'border-width': 2,
         'border-color': '#ffffff',
       },
@@ -61,13 +84,33 @@ export function buildStylesheet() {
         'target-arrow-shape': 'triangle',
         'arrow-scale': 1.1,
         'curve-style': 'bezier',
+        label: '',
+        color: 'data(color)',
+      },
+    },
+    // Per-type line style: a non-color cue so relationship types stay
+    // distinguishable for color-blind users (depends_on stays solid).
+    {
+      selector: 'edge[type = "extends"]',
+      style: { 'line-style': 'dashed' },
+    },
+    {
+      selector: 'edge[type = "used_with"]',
+      style: { 'line-style': 'dotted' },
+    },
+    {
+      selector: 'edge[type = "replaces"]',
+      style: { 'line-style': 'dashed', 'line-dash-pattern': [10, 3, 2, 3] },
+    },
+    {
+      selector: 'edge.show-label',
+      style: {
         label: 'data(type)',
         'font-family': 'IBM Plex Mono, monospace',
         'font-size': 9,
-        color: 'data(color)',
         'text-rotation': 'autorotate',
         'text-background-color': '#f2f5f4',
-        'text-background-opacity': 0.9,
+        'text-background-opacity': 0.95,
         'text-background-padding': 2,
       },
     },

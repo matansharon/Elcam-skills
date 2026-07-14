@@ -699,7 +699,7 @@ table.data td.cell-muted {
   position: relative;
   overflow: hidden;
 }
-.graph-canvas > div {
+.graph-cy {
   position: absolute;
   inset: 0;
 }
@@ -723,6 +723,44 @@ table.data td.cell-muted {
   display: flex;
   flex-direction: column;
   gap: 5px;
+}
+.graph-search {
+  width: 100%;
+  margin-bottom: 4px;
+}
+.graph-controls {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.graph-controls .btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  font-size: 15px;
+  line-height: 1;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.graph-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  pointer-events: none;
+}
+.graph-legend-note {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
 }
 
 /* --- admin ------------------------------------------------------------ */
