@@ -4,8 +4,8 @@ from functools import wraps
 from flask import Blueprint, abort, jsonify, request
 from flask_login import current_user, login_required
 
-from models import PERMISSION_LEVELS, ROLES, Skill, SkillPermission, User, db
-from services import log_action
+from models import PERMISSION_LEVELS, ROLES, Favorite, Skill, SkillPermission, User, db
+from services import favorite_skill_ids, favorites_of, get_permission_level, log_action
 
 users_bp = Blueprint("users", __name__, url_prefix="/api/users")
 
@@ -24,6 +24,40 @@ def admin_required(fn):
 @admin_required
 def list_users():
     return jsonify([u.to_dict() for u in User.query.order_by(User.username).all()])
+
+
+@users_bp.get("/<int:user_id>")
+@login_required
+def get_user(user_id):
+    if not (current_user.is_admin or current_user.id == user_id):
+        abort(404, description="User not found")
+    user = db.session.get(User, user_id)
+    if user is None:
+        abort(404, description="User not found")
+    data = user.to_dict()
+    data["owned_count"] = Skill.query.filter_by(owner_id=user_id).count()
+    data["favorite_count"] = Favorite.query.filter_by(user_id=user_id).count()
+    return jsonify(data)
+
+
+@users_bp.get("/<int:user_id>/favorites")
+@login_required
+def user_favorites(user_id):
+    if not (current_user.is_admin or current_user.id == user_id):
+        abort(404, description="User not found")
+    target = db.session.get(User, user_id)
+    if target is None:
+        abort(404, description="User not found")
+    fav_ids = favorite_skill_ids(current_user)
+    skills = favorites_of(target, current_user)
+    skills.sort(key=lambda s: s.updated_at, reverse=True)
+    return jsonify([
+        s.to_dict(
+            my_permission=get_permission_level(current_user, s),
+            favorited=s.id in fav_ids,
+        )
+        for s in skills
+    ])
 
 
 @users_bp.post("")
