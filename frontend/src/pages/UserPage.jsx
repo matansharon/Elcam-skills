@@ -43,10 +43,12 @@ export default function UserPage() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
+    let cancelled = false
     setProfile(null); setOwned(null); setFavorites(null); setError(null)
-    api.get(`/api/users/${id}`).then(setProfile).catch((e) => setError(e.message))
-    api.get(`/api/skills?owner=${id}`).then(setOwned).catch(() => setOwned([]))
-    api.get(`/api/users/${id}/favorites`).then(setFavorites).catch(() => setFavorites([]))
+    api.get(`/api/users/${id}`).then((d) => !cancelled && setProfile(d)).catch((e) => !cancelled && setError(e.message))
+    api.get(`/api/skills?owner=${id}`).then((d) => !cancelled && setOwned(d)).catch(() => !cancelled && setOwned([]))
+    api.get(`/api/users/${id}/favorites`).then((d) => !cancelled && setFavorites(d)).catch(() => !cancelled && setFavorites([]))
+    return () => { cancelled = true }
   }, [id])
 
   if (error) {
