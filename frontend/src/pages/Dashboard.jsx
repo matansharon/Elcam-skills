@@ -7,10 +7,12 @@ import TagChips from '../components/TagChips'
 import SkillFormModal from '../components/SkillFormModal'
 import FavoriteStar from '../components/FavoriteStar'
 import FolderTree from '../components/FolderTree'
+import FolderMenu from '../components/FolderMenu'
 
 export default function Dashboard() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const [allSkills, setAllSkills] = useState(null) // unfiltered, for options
   const [skills, setSkills] = useState(null)
   const [folders, setFolders] = useState([])
@@ -24,6 +26,9 @@ export default function Dashboard() {
   const [category, setCategory] = useState('')
   const [owner, setOwner] = useState('')
   const [tag, setTag] = useState('')
+  const [selectedIds, setSelectedIds] = useState(new Set()) // bulk-select skill ids
+  const [menuFor, setMenuFor] = useState(null)              // skillId with open FolderMenu
+  const [skillFolderIds, setSkillFolderIds] = useState({})  // skillId -> [folderId] cache
 
   const loadFolders = () =>
     api.get('/api/folders').then(setFolders).catch(() => setFolders([]))
@@ -71,13 +76,98 @@ export default function Dashboard() {
     navigate(`/skills/${skill.id}`)
   }
 
+  const reload = () => {
+    const params = new URLSearchParams()
+    if (q) params.set('q', q)
+    if (status) params.set('status', status)
+    if (category) params.set('category', category)
+    if (owner) params.set('owner', owner)
+    if (tag) params.set('tag', tag)
+    if (selectedFolder === 'unfiled') params.set('folder', 'unfiled')
+    else if (selectedFolder != null) params.set('folder', String(selectedFolder))
+    api.get(`/api/skills?${params.toString()}`).then(setSkills).catch((e) => setError(e.message))
+  }
+
+  const createFolder = async (parentId) => {
+    const name = window.prompt('New folder name:')
+    if (!name || !name.trim()) return
+    try {
+      await api.post('/api/folders', { name: name.trim(), parent_id: parentId })
+      loadFolders()
+    } catch (e) { setError(e.message) }
+  }
+
+  const renameFolder = async (folder) => {
+    const name = window.prompt('Rename folder:', folder.name)
+    if (!name || !name.trim() || name.trim() === folder.name) return
+    try {
+      await api.put(`/api/folders/${folder.id}`, { name: name.trim() })
+      loadFolders()
+    } catch (e) { setError(e.message) }
+  }
+
+  const deleteFolder = async (folder) => {
+    if (!window.confirm(
+      `Delete "${folder.name}"? Subfolders are deleted and their skills become unfiled. Skills are not deleted.`
+    )) return
+    try {
+      await api.del(`/api/folders/${folder.id}`)
+      if (selectedFolder === folder.id) setSelectedFolder(null)
+      loadFolders()
+      reload()
+    } catch (e) { setError(e.message) }
+  }
+
+  const dropSkillOnFolder = async (skillId, folderId) => {
+    try {
+      // drag = move: membership becomes exactly [folderId]
+      await api.put(`/api/skills/${skillId}/folders`, { folder_ids: [folderId] })
+      loadFolders()
+      reload()
+    } catch (e) { setError(e.message) }
+  }
+
+  const toggleSelected = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const bulkMoveTo = async (folderId) => {
+    if (!selectedIds.size) return
+    try {
+      await api.post(`/api/folders/${folderId}/skills`, {
+        skill_ids: [...selectedIds], mode: 'move',
+      })
+      setSelectedIds(new Set())
+      loadFolders()
+      reload()
+    } catch (e) { setError(e.message) }
+  }
+
+  const openFolderMenu = async (skillId) => {
+    if (menuFor === skillId) { setMenuFor(null); return }
+    try {
+      const detail = await api.get(`/api/skills/${skillId}`)
+      setSkillFolderIds((m) => ({ ...m, [skillId]: (detail.folders || []).map((f) => f.id) }))
+      setMenuFor(skillId)
+    } catch (e) { setError(e.message) }
+  }
+
   return (
     <div className="dashboard-layout">
       <FolderTree
         folders={folders}
         selected={selectedFolder}
         onSelect={setSelectedFolder}
-        isAdmin={false}
+        isAdmin={isAdmin}
+        onCreate={createFolder}
+        onRename={renameFolder}
+        onDelete={deleteFolder}
+        onDropSkill={dropSkillOnFolder}
       />
 
       <div className="dashboard-main">
@@ -94,6 +184,27 @@ export default function Dashboard() {
         </div>
 
         {error && <div className="banner banner-error">{error}</div>}
+
+        {isAdmin && selectedIds.size > 0 && (
+          <div className="bulk-bar">
+            <span>{selectedIds.size} selected</span>
+            <label>
+              Move to:
+              <select
+                defaultValue=""
+                onChange={(e) => { if (e.target.value) bulkMoveTo(Number(e.target.value)) }}
+              >
+                <option value="" disabled>Choose folder…</option>
+                {folders.map((f) => (
+                  <option key={f.id} value={f.id}>{f.name}</option>
+                ))}
+              </select>
+            </label>
+            <button className="btn btn-ghost btn-sm" onClick={() => setSelectedIds(new Set())}>
+              Clear
+            </button>
+          </div>
+        )}
 
         <div className="card">
           <div className="toolbar">
@@ -132,7 +243,9 @@ export default function Dashboard() {
             <table className="data">
               <thead>
                 <tr>
-                  <th aria-label="Favorite"></th>
+                  <th aria-label="Select">
+                    {isAdmin ? <span className="cell-muted">☑</span> : ''}
+                  </th>
                   <th>Name</th>
                   <th>Description</th>
                   <th>Category</th>
@@ -145,8 +258,19 @@ export default function Dashboard() {
               </thead>
               <tbody>
                 {(skills || []).map((s) => (
-                  <tr key={s.id}>
-                    <td>
+                  <tr
+                    key={s.id}
+                    draggable={isAdmin}
+                    onDragStart={(e) => e.dataTransfer.setData('text/skill-id', String(s.id))}
+                  >
+                    <td className="cell-select">
+                      {isAdmin && (
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(s.id)}
+                          onChange={() => toggleSelected(s.id)}
+                        />
+                      )}
                       <FavoriteStar skillId={s.id} favorited={s.favorited} />
                     </td>
                     <td className="cell-name">
@@ -170,8 +294,28 @@ export default function Dashboard() {
                     <td>
                       <span className="mono">v{s.current_version}</span>
                     </td>
-                    <td>
+                    <td className="cell-access">
                       <span className="badge badge-perm">{s.my_permission}</span>
+                      {isAdmin && (
+                        <span className="folder-menu-anchor">
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => openFolderMenu(s.id)}
+                          >
+                            Folders…
+                          </button>
+                          {menuFor === s.id && (
+                            <FolderMenu
+                              skillId={s.id}
+                              currentFolderIds={skillFolderIds[s.id] || []}
+                              folders={folders}
+                              onClose={() => setMenuFor(null)}
+                              onApply={() => { loadFolders(); reload() }}
+                            />
+                          )}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}
