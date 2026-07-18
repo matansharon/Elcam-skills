@@ -1093,4 +1093,5 @@ table.data td.cell-muted {
 .folder-menu-list { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.25rem; }
 .folder-menu-item { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
 .folder-menu-actions { display: flex; justify-content: flex-end; gap: 0.4rem; margin-top: 0.5rem; }
+.folder-menu-error { color: #c0392b; font-size: 0.8rem; margin-top: 0.4rem; }
 tr[draggable='true'] { cursor: grab; }

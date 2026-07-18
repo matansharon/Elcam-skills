@@ -5,6 +5,7 @@ import { api } from '../api/client'
 export default function FolderMenu({ skillId, currentFolderIds, folders, onApply, onClose }) {
   const [checked, setChecked] = useState(new Set(currentFolderIds || []))
   const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
   const ref = useRef(null)
 
   useEffect(() => {
@@ -24,11 +25,14 @@ export default function FolderMenu({ skillId, currentFolderIds, folders, onApply
 
   const apply = async () => {
     setBusy(true)
+    setErr(null)
     try {
       const folderIds = [...checked]
       await api.put(`/api/skills/${skillId}/folders`, { folder_ids: folderIds })
       onApply?.(folderIds)
       onClose?.()
+    } catch (e) {
+      setErr(e.message)
     } finally {
       setBusy(false)
     }
@@ -46,6 +50,7 @@ export default function FolderMenu({ skillId, currentFolderIds, folders, onApply
           </label>
         ))}
       </div>
+      {err && <div className="folder-menu-error">{err}</div>}
       <div className="folder-menu-actions">
         <button className="btn btn-ghost btn-sm" onClick={onClose} disabled={busy}>Cancel</button>
         <button className="btn btn-primary btn-sm" onClick={apply} disabled={busy}>Apply</button>
