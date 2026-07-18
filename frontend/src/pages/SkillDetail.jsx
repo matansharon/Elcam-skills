@@ -5,6 +5,7 @@ import { api } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 import StatusBadge from '../components/StatusBadge'
 import TagChips from '../components/TagChips'
+import FavoriteStar from '../components/FavoriteStar'
 import SkillFormModal from '../components/SkillFormModal'
 import VersionHistory from '../components/VersionHistory'
 import LinksPanel from '../components/LinksPanel'
@@ -104,7 +105,10 @@ export default function SkillDetail() {
     <div>
       <div className="page-header">
         <div>
-          <h1>{skill.name}</h1>
+          <div className="detail-title-row">
+            <h1>{skill.name}</h1>
+            <FavoriteStar skillId={skill.id} favorited={skill.favorited} />
+          </div>
           <div className="subtitle">
             <StatusBadge status={skill.status} />{' '}
             <span className="mono">v{skill.current_version}</span>
