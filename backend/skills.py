@@ -6,17 +6,21 @@ from flask import Blueprint, abort, current_app, jsonify, request, send_file
 from flask_login import current_user, login_required
 
 from analysis import analyze_skill, AnalysisError
-from models import AuditLog, SkillVersion
+from models import AuditLog, SkillFolder, SkillVersion, db
 from packages import parse_package
 from services import (
     create_skill,
     create_skill_from_package,
     create_version_from_package,
     delete_skill,
+    favorite_skill_ids,
     get_permission_level,
     get_visible_skill_or_404,
+    require_admin,
     require_edit,
     restore_version,
+    set_skill_folders,
+    skill_folders,
     update_skill,
     visible_skills,
 )
@@ -61,7 +65,22 @@ def list_skills():
     category = (request.args.get("category") or "").strip()
     owner = (request.args.get("owner") or "").strip()
     status = (request.args.get("status") or "").strip()
+    folder = (request.args.get("folder") or "").strip()
 
+    folder_filter = None  # None | ("include", set) | ("exclude", set)
+    if folder == "unfiled":
+        filed = {row[0] for row in db.session.query(SkillFolder.skill_id).distinct()}
+        folder_filter = ("exclude", filed)
+    elif folder:
+        try:
+            fid = int(folder)
+        except ValueError:
+            abort(400, description="folder must be an id or 'unfiled'")
+        member = {row[0] for row in
+                  db.session.query(SkillFolder.skill_id).filter_by(folder_id=fid)}
+        folder_filter = ("include", member)
+
+    fav_ids = favorite_skill_ids(current_user)
     result = []
     for skill in visible_skills(current_user):
         if q and q not in skill.name.lower() and q not in (skill.description or "").lower():
@@ -74,8 +93,17 @@ def list_skills():
             continue
         if owner and str(skill.owner_id) != owner and skill.owner.display_name != owner:
             continue
+        if folder_filter is not None:
+            fmode, fids = folder_filter
+            if fmode == "include" and skill.id not in fids:
+                continue
+            if fmode == "exclude" and skill.id in fids:
+                continue
         result.append(
-            skill.to_dict(my_permission=get_permission_level(current_user, skill))
+            skill.to_dict(
+                my_permission=get_permission_level(current_user, skill),
+                favorited=skill.id in fav_ids,
+            )
         )
     result.sort(key=lambda s: s["updated_at"], reverse=True)
     return jsonify(result)
@@ -143,9 +171,26 @@ def upload_create():
 @login_required
 def get_skill(skill_id):
     skill = get_visible_skill_or_404(current_user, skill_id)
-    return jsonify(
-        skill.to_dict(my_permission=get_permission_level(current_user, skill))
+    fav_ids = favorite_skill_ids(current_user)
+    data = skill.to_dict(
+        my_permission=get_permission_level(current_user, skill),
+        favorited=skill.id in fav_ids,
     )
+    data["folders"] = skill_folders(skill)
+    return jsonify(data)
+
+
+@skills_bp.put("/<int:skill_id>/folders")
+@login_required
+def set_folders(skill_id):
+    require_admin(current_user)
+    skill = get_visible_skill_or_404(current_user, skill_id)
+    data = request.get_json(silent=True) or {}
+    folder_ids = data.get("folder_ids", [])
+    if not isinstance(folder_ids, list):
+        abort(400, description="folder_ids must be a list")
+    set_skill_folders(skill, folder_ids)
+    return jsonify({"folders": skill_folders(skill)})
 
 
 @skills_bp.put("/<int:skill_id>")
@@ -154,8 +199,12 @@ def update(skill_id):
     skill = get_visible_skill_or_404(current_user, skill_id)
     require_edit(current_user, skill)
     update_skill(current_user, skill, request.get_json(silent=True) or {})
+    fav_ids = favorite_skill_ids(current_user)
     return jsonify(
-        skill.to_dict(my_permission=get_permission_level(current_user, skill))
+        skill.to_dict(
+            my_permission=get_permission_level(current_user, skill),
+            favorited=skill.id in fav_ids,
+        )
     )
 
 

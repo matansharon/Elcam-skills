@@ -9,7 +9,10 @@ from models import (
     RELATIONSHIP_TYPES,
     STATUSES,
     AuditLog,
+    Favorite,
+    Folder,
     Skill,
+    SkillFolder,
     SkillPermission,
     SkillRelationship,
     SkillVersion,
@@ -17,6 +20,8 @@ from models import (
     utcnow,
 )
 from activity_log import set_activity_summary
+
+_UNSET = object()
 
 
 # --- audit -----------------------------------------------------------------
@@ -66,6 +71,153 @@ def get_visible_skill_or_404(user, skill_id):
 def require_edit(user, skill):
     if get_permission_level(user, skill) != "edit":
         abort(403, description="Edit permission required")
+
+
+def require_admin(user):
+    if not user.is_admin:
+        abort(403, description="Admin access required")
+
+
+# --- favorites -------------------------------------------------------------
+
+def favorite_skill_ids(user):
+    return {f.skill_id for f in Favorite.query.filter_by(user_id=user.id)}
+
+
+def toggle_favorite(user, skill, on):
+    existing = Favorite.query.filter_by(user_id=user.id, skill_id=skill.id).first()
+    if on and existing is None:
+        db.session.add(Favorite(user_id=user.id, skill_id=skill.id))
+    elif not on and existing is not None:
+        db.session.delete(existing)
+    db.session.commit()
+
+
+def favorites_of(target_user, viewer):
+    """Skills favorited by target_user, filtered to viewer's visibility."""
+    fav_ids = {f.skill_id for f in Favorite.query.filter_by(user_id=target_user.id)}
+    return [s for s in visible_skills(viewer) if s.id in fav_ids]
+
+
+def visible_favorites(user):
+    return favorites_of(user, user)
+
+
+# --- folders -----------------------------------------------------------
+
+def get_folder_or_404(folder_id):
+    folder = db.session.get(Folder, folder_id)
+    if folder is None:
+        abort(404, description="Folder not found")
+    return folder
+
+
+def _sibling_name_taken(name, parent_id, exclude_id=None):
+    q = Folder.query.filter_by(name=name, parent_id=parent_id)
+    if exclude_id is not None:
+        q = q.filter(Folder.id != exclude_id)
+    return q.first() is not None
+
+
+def _would_create_cycle(folder, new_parent_id):
+    """True if making new_parent_id the parent of `folder` forms a cycle."""
+    current_id = new_parent_id
+    while current_id is not None:
+        if current_id == folder.id:
+            return True
+        parent = db.session.get(Folder, current_id)
+        current_id = parent.parent_id if parent else None
+    return False
+
+
+def create_folder(user, name, parent_id):
+    name = (name or "").strip()
+    if not name:
+        abort(400, description="Folder name is required")
+    if parent_id is not None and db.session.get(Folder, parent_id) is None:
+        abort(400, description="Parent folder not found")
+    if _sibling_name_taken(name, parent_id):
+        abort(400, description="A folder with this name already exists here")
+    folder = Folder(name=name, parent_id=parent_id, created_by=user.id)
+    db.session.add(folder)
+    db.session.commit()
+    return folder
+
+
+def update_folder(user, folder, name=_UNSET, parent_id=_UNSET):
+    new_name = folder.name if name is _UNSET else (name or "").strip()
+    if not new_name:
+        abort(400, description="Folder name is required")
+    new_parent_id = folder.parent_id if parent_id is _UNSET else parent_id
+    if parent_id is not _UNSET and parent_id is not None:
+        if db.session.get(Folder, parent_id) is None:
+            abort(400, description="Parent folder not found")
+        if _would_create_cycle(folder, parent_id):
+            abort(400, description="Cannot move a folder into itself or a descendant")
+    if _sibling_name_taken(new_name, new_parent_id, exclude_id=folder.id):
+        abort(400, description="A folder with this name already exists here")
+    folder.name = new_name
+    folder.parent_id = new_parent_id
+    db.session.commit()
+    return folder
+
+
+def delete_folder(user, folder):
+    db.session.delete(folder)  # cascade removes subfolders + memberships
+    db.session.commit()
+
+
+def visible_folder_tree(user):
+    """All folders as a flat list; skill_count counts memberships whose skill
+    is visible to `user`. The frontend nests by parent_id."""
+    visible_ids = {s.id for s in visible_skills(user)}
+    counts = {}
+    for link in SkillFolder.query.all():
+        if link.skill_id in visible_ids:
+            counts[link.folder_id] = counts.get(link.folder_id, 0) + 1
+    folders = Folder.query.order_by(Folder.name).all()
+    return [f.to_dict(skill_count=counts.get(f.id, 0)) for f in folders]
+
+
+def skill_folders(skill):
+    """List of {id, name} for the folders this skill belongs to."""
+    result = []
+    for link in SkillFolder.query.filter_by(skill_id=skill.id):
+        folder = db.session.get(Folder, link.folder_id)
+        if folder is not None:
+            result.append({"id": folder.id, "name": folder.name})
+    return result
+
+
+def set_skill_folders(skill, folder_ids):
+    """Replace the skill's folder memberships with exactly folder_ids."""
+    ids = list(dict.fromkeys(folder_ids or []))  # de-dupe, keep order
+    for fid in ids:
+        if db.session.get(Folder, fid) is None:
+            abort(400, description=f"Folder {fid} not found")
+    SkillFolder.query.filter_by(skill_id=skill.id).delete()
+    for fid in ids:
+        db.session.add(SkillFolder(skill_id=skill.id, folder_id=fid))
+    db.session.commit()
+
+
+def bulk_assign(folder, skill_ids, mode):
+    """mode 'move' sets each skill's membership to exactly [folder]; mode
+    'add' adds folder to each skill's existing memberships."""
+    if mode not in ("move", "add"):
+        abort(400, description="mode must be 'move' or 'add'")
+    for sid in skill_ids or []:
+        if db.session.get(Skill, sid) is None:
+            abort(400, description=f"Skill {sid} not found")
+        if mode == "move":
+            SkillFolder.query.filter_by(skill_id=sid).delete()
+            db.session.add(SkillFolder(skill_id=sid, folder_id=folder.id))
+        else:
+            exists = SkillFolder.query.filter_by(
+                skill_id=sid, folder_id=folder.id).first()
+            if exists is None:
+                db.session.add(SkillFolder(skill_id=sid, folder_id=folder.id))
+    db.session.commit()
 
 
 # --- skill lifecycle -------------------------------------------------------

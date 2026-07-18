@@ -9,7 +9,9 @@ import argparse
 import sys
 
 from app import create_app
-from models import SkillPermission, SkillRelationship, User, db
+from models import (
+    Favorite, Folder, SkillFolder, SkillPermission, SkillRelationship, User, db,
+)
 from services import create_skill, log_action, update_skill
 
 
@@ -239,6 +241,56 @@ def make_permissions(users, skills):
     db.session.commit()
 
 
+# (folder key, display name, parent key or None)
+FOLDERS = [
+    ("processing", "Document Processing", None),
+    ("extraction", "Data Extraction", None),
+    ("quality", "Quality & Reporting", None),
+    ("quality_coc", "COC", "quality"),
+]
+
+# (folder key, skill key) memberships
+FOLDER_SKILLS = [
+    ("processing", "summarizer"),
+    ("processing", "regulation"),
+    ("extraction", "pdf_tables"),
+    ("extraction", "stability"),
+    ("quality", "coc_report"),
+    ("quality_coc", "coc_report"),   # multi-folder membership demo
+]
+
+# (username, skill key) favorites
+FAVORITES = [
+    ("dana", "summarizer"),
+    ("dana", "meeting_prep"),
+    ("yossi", "pdf_tables"),
+]
+
+
+def make_folders(users, skills):
+    folders = {}
+    for key, name, parent_key in FOLDERS:
+        parent_id = folders[parent_key].id if parent_key else None
+        folder = Folder(name=name, parent_id=parent_id, created_by=users["admin"].id)
+        db.session.add(folder)
+        db.session.flush()  # assign id for children/memberships
+        folders[key] = folder
+    for folder_key, skill_key in FOLDER_SKILLS:
+        db.session.add(SkillFolder(
+            skill_id=skills[skill_key].id, folder_id=folders[folder_key].id,
+        ))
+    db.session.commit()
+    return folders
+
+
+def make_favorites(users, skills):
+    for username, skill_key in FAVORITES:
+        db.session.add(Favorite(
+            user_id=users[username].id, skill_id=skills[skill_key].id,
+        ))
+    db.session.commit()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--force", action="store_true",
@@ -258,9 +310,12 @@ def main():
         skills = make_skills(users)
         make_relationships(users, skills)
         make_permissions(users, skills)
+        make_folders(users, skills)
+        make_favorites(users, skills)
 
         print(f"Seeded {len(users)} users, {len(skills)} skills, "
-              f"{len(RELATIONSHIPS)} relationships, {len(PERMISSIONS)} permissions.")
+              f"{len(RELATIONSHIPS)} relationships, {len(PERMISSIONS)} permissions, "
+              f"{len(FOLDERS)} folders, {len(FAVORITES)} favorites.")
         print("Demo logins: admin/admin123, dana/dana123, yossi/yossi123")
 
 
