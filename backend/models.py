@@ -27,6 +27,11 @@ class User(UserMixin, db.Model):
     role = db.Column(db.String(10), nullable=False, default="user")
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
 
+    favorites = db.relationship(
+        "Favorite", backref="user",
+        cascade="all, delete-orphan", lazy="dynamic",
+    )
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
@@ -81,13 +86,21 @@ class Skill(db.Model):
         "SkillRelationship", foreign_keys="SkillRelationship.target_skill_id",
         backref="target_skill", cascade="all, delete-orphan", lazy="dynamic",
     )
+    folder_links = db.relationship(
+        "SkillFolder", backref="skill",
+        cascade="all, delete-orphan", lazy="dynamic",
+    )
+    favorited_by = db.relationship(
+        "Favorite", backref="skill",
+        cascade="all, delete-orphan", lazy="dynamic",
+    )
 
     @property
     def current_version(self):
         latest = self.versions.order_by(SkillVersion.version_number.desc()).first()
         return latest.version_number if latest else 0
 
-    def to_dict(self, my_permission=None):
+    def to_dict(self, my_permission=None, favorited=False):
         return {
             "id": self.id,
             "name": self.name,
@@ -100,6 +113,7 @@ class Skill(db.Model):
             "updated_at": self.updated_at.isoformat(),
             "current_version": self.current_version,
             "my_permission": my_permission,
+            "favorited": favorited,
         }
 
 
@@ -178,6 +192,55 @@ class SkillRelationship(db.Model):
             "target": self.target_skill_id,
             "type": self.type,
         }
+
+
+class Folder(db.Model):
+    __tablename__ = "folders"
+    __table_args__ = (db.UniqueConstraint("parent_id", "name"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    parent_id = db.Column(db.Integer, db.ForeignKey("folders.id"), nullable=True)
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+
+    children = db.relationship(
+        "Folder",
+        backref=db.backref("parent", remote_side=[id]),
+        cascade="all, delete-orphan",
+        lazy="dynamic",
+    )
+    skill_links = db.relationship(
+        "SkillFolder", backref="folder",
+        cascade="all, delete-orphan", lazy="dynamic",
+    )
+
+    def to_dict(self, skill_count=0):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "parent_id": self.parent_id,
+            "skill_count": skill_count,
+        }
+
+
+class SkillFolder(db.Model):
+    __tablename__ = "skill_folders"
+    __table_args__ = (db.UniqueConstraint("skill_id", "folder_id"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    skill_id = db.Column(db.Integer, db.ForeignKey("skills.id"), nullable=False)
+    folder_id = db.Column(db.Integer, db.ForeignKey("folders.id"), nullable=False)
+
+
+class Favorite(db.Model):
+    __tablename__ = "favorites"
+    __table_args__ = (db.UniqueConstraint("user_id", "skill_id"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    skill_id = db.Column(db.Integer, db.ForeignKey("skills.id"), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
 
 
 class AuditLog(db.Model):
