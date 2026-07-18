@@ -4,7 +4,7 @@ from functools import wraps
 from flask import Blueprint, abort, jsonify, request
 from flask_login import current_user, login_required
 
-from models import PERMISSION_LEVELS, ROLES, Favorite, Skill, SkillPermission, User, db
+from models import PERMISSION_LEVELS, ROLES, Skill, SkillPermission, User, db
 from services import favorite_skill_ids, favorites_of, get_permission_level, log_action
 
 users_bp = Blueprint("users", __name__, url_prefix="/api/users")
@@ -36,7 +36,7 @@ def get_user(user_id):
         abort(404, description="User not found")
     data = user.to_dict()
     data["owned_count"] = Skill.query.filter_by(owner_id=user_id).count()
-    data["favorite_count"] = Favorite.query.filter_by(user_id=user_id).count()
+    data["favorite_count"] = len(favorites_of(user, current_user))
     return jsonify(data)
 
 

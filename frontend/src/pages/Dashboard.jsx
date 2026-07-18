@@ -32,7 +32,7 @@ export default function Dashboard() {
   const [skillFolderIds, setSkillFolderIds] = useState({})  // skillId -> [folderId] cache
 
   const loadFolders = () =>
-    api.get('/api/folders').then(setFolders).catch(() => setFolders([]))
+    api.get('/api/folders').then((f) => { setFolders(f); return f }).catch(() => { setFolders([]); return [] })
 
   useEffect(() => {
     api.get('/api/skills').then(setAllSkills).catch((e) => setError(e.message))
@@ -45,6 +45,7 @@ export default function Dashboard() {
   }, [search])
 
   useEffect(() => {
+    setSelectedIds(new Set())
     const params = new URLSearchParams()
     if (q) params.set('q', q)
     if (status) params.set('status', status)
@@ -114,7 +115,10 @@ export default function Dashboard() {
     try {
       await api.del(`/api/folders/${folder.id}`)
       if (selectedFolder === folder.id) setSelectedFolder(null)
-      loadFolders()
+      const fresh = await loadFolders()
+      if (typeof selectedFolder === 'number' && !fresh.some((f) => f.id === selectedFolder)) {
+        setSelectedFolder(null)
+      }
       reload()
     } catch (e) { setError(e.message) }
   }

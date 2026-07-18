@@ -140,3 +140,24 @@ def test_folder_skill_count_respects_viewer_visibility(client, admin_user, regul
     login(regular_user)
     tree = {f["name"]: f["skill_count"] for f in client.get("/api/folders").get_json()}
     assert tree["A"] == 0
+
+
+def test_membership_invalid_inputs(client, admin_user, login, make_skill):
+    login(admin_user)
+    skill_id = make_skill(admin_user, "Bad Input Skill")
+    folder = client.post("/api/folders", json={"name": "Box"}).get_json()
+    # bad folder id in PUT body -> 400
+    assert client.put(f"/api/skills/{skill_id}/folders",
+                      json={"folder_ids": [999999]}).status_code == 400
+    # non-list folder_ids -> 400
+    assert client.put(f"/api/skills/{skill_id}/folders",
+                      json={"folder_ids": "nope"}).status_code == 400
+    # bulk: bad mode -> 400
+    assert client.post(f"/api/folders/{folder['id']}/skills",
+                       json={"skill_ids": [skill_id], "mode": "sideways"}).status_code == 400
+    # bulk: bad skill id -> 400 (parity with set_skill_folders)
+    assert client.post(f"/api/folders/{folder['id']}/skills",
+                       json={"skill_ids": [999999], "mode": "move"}).status_code == 400
+    # non-list skill_ids -> 400
+    assert client.post(f"/api/folders/{folder['id']}/skills",
+                       json={"skill_ids": "nope", "mode": "move"}).status_code == 400

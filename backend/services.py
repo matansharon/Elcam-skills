@@ -208,7 +208,7 @@ def bulk_assign(folder, skill_ids, mode):
         abort(400, description="mode must be 'move' or 'add'")
     for sid in skill_ids or []:
         if db.session.get(Skill, sid) is None:
-            abort(404, description=f"Skill {sid} not found")
+            abort(400, description=f"Skill {sid} not found")
         if mode == "move":
             SkillFolder.query.filter_by(skill_id=sid).delete()
             db.session.add(SkillFolder(skill_id=sid, folder_id=folder.id))
