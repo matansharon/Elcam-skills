@@ -1095,3 +1095,6 @@ table.data td.cell-muted {
 .folder-menu-actions { display: flex; justify-content: flex-end; gap: 0.4rem; margin-top: 0.5rem; }
 .folder-menu-error { color: #c0392b; font-size: 0.8rem; margin-top: 0.4rem; }
 tr[draggable='true'] { cursor: grab; }
+
+.user-page .card { margin-bottom: 1rem; }
+.section-title { margin: 0 0 0.5rem; font-size: 1rem; }

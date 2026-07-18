@@ -3,6 +3,7 @@ import { useAuth } from './auth/AuthContext'
 import LoginPage from './auth/LoginPage'
 import Dashboard from './pages/Dashboard'
 import SkillDetail from './pages/SkillDetail'
+import UserPage from './pages/UserPage'
 import GraphView from './pages/GraphView'
 import AdminPanel from './pages/AdminPanel'
 import ActivityPage from './activity/ActivityPage'
@@ -36,6 +37,7 @@ function Layout() {
             Dashboard
           </NavLink>
           <NavLink to="/graph">Graph</NavLink>
+          <NavLink to={`/users/${user?.id}`}>My Page</NavLink>
           {user?.role === 'admin' && <NavLink to="/admin">Admin</NavLink>}
         </nav>
         <div className="nav-user">
@@ -69,6 +71,7 @@ export default function App() {
       >
         <Route index element={<Dashboard />} />
         <Route path="skills/:id" element={<SkillDetail />} />
+        <Route path="users/:id" element={<UserPage />} />
         <Route path="graph" element={<GraphView />} />
         <Route
           path="admin"

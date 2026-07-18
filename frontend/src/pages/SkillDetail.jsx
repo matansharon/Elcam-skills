@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import { api } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
@@ -115,7 +115,7 @@ export default function SkillDetail() {
             {' · '}
             {skill.category || 'uncategorized'}
             {' · owned by '}
-            {skill.owner.display_name}
+            <Link to={`/users/${skill.owner.id}`}>{skill.owner.display_name}</Link>
             {' · updated '}
             {new Date(skill.updated_at).toLocaleString()}
           </div>
