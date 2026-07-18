@@ -28,6 +28,7 @@ export default function Dashboard() {
   const [tag, setTag] = useState('')
   const [selectedIds, setSelectedIds] = useState(new Set()) // bulk-select skill ids
   const [menuFor, setMenuFor] = useState(null)              // skillId with open FolderMenu
+  const [menuAnchor, setMenuAnchor] = useState(null)        // trigger rect for popover positioning
   const [skillFolderIds, setSkillFolderIds] = useState({})  // skillId -> [folderId] cache
 
   const loadFolders = () =>
@@ -148,11 +149,13 @@ export default function Dashboard() {
     } catch (e) { setError(e.message) }
   }
 
-  const openFolderMenu = async (skillId) => {
-    if (menuFor === skillId) { setMenuFor(null); return }
+  const openFolderMenu = async (skillId, el) => {
+    if (menuFor === skillId) { setMenuFor(null); setMenuAnchor(null); return }
+    const rect = el.getBoundingClientRect()
     try {
       const detail = await api.get(`/api/skills/${skillId}`)
       setSkillFolderIds((m) => ({ ...m, [skillId]: (detail.folders || []).map((f) => f.id) }))
+      setMenuAnchor(rect)
       setMenuFor(skillId)
     } catch (e) { setError(e.message) }
   }
@@ -301,7 +304,7 @@ export default function Dashboard() {
                           <button
                             type="button"
                             className="btn btn-ghost btn-sm"
-                            onClick={() => openFolderMenu(s.id)}
+                            onClick={(e) => openFolderMenu(s.id, e.currentTarget)}
                           >
                             Folders…
                           </button>
@@ -310,7 +313,8 @@ export default function Dashboard() {
                               skillId={s.id}
                               currentFolderIds={skillFolderIds[s.id] || []}
                               folders={folders}
-                              onClose={() => setMenuFor(null)}
+                              anchorRect={menuAnchor}
+                              onClose={() => { setMenuFor(null); setMenuAnchor(null) }}
                               onApply={() => { loadFolders(); reload() }}
                             />
                           )}

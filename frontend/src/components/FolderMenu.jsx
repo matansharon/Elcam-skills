@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { api } from '../api/client'
 
 // A checkbox popover: check/uncheck folders to set a skill's exact membership.
-export default function FolderMenu({ skillId, currentFolderIds, folders, onApply, onClose }) {
+export default function FolderMenu({ skillId, currentFolderIds, folders, anchorRect, onApply, onClose }) {
   const [checked, setChecked] = useState(new Set(currentFolderIds || []))
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
@@ -38,8 +39,20 @@ export default function FolderMenu({ skillId, currentFolderIds, folders, onApply
     }
   }
 
-  return (
-    <div className="folder-menu" ref={ref}>
+  const MENU_MAX = 320
+  const openUp = anchorRect && anchorRect.bottom + MENU_MAX > window.innerHeight
+  const style = anchorRect
+    ? {
+        position: 'fixed',
+        top: openUp ? 'auto' : `${anchorRect.bottom + 4}px`,
+        bottom: openUp ? `${window.innerHeight - anchorRect.top + 4}px` : 'auto',
+        right: `${Math.max(8, window.innerWidth - anchorRect.right)}px`,
+        margin: 0,
+      }
+    : {}
+
+  return createPortal(
+    <div className="folder-menu" ref={ref} style={style}>
       <div className="folder-menu-title">Folders</div>
       <div className="folder-menu-list">
         {folders.length === 0 && <div className="cell-muted">No folders yet.</div>}
@@ -55,6 +68,7 @@ export default function FolderMenu({ skillId, currentFolderIds, folders, onApply
         <button className="btn btn-ghost btn-sm" onClick={onClose} disabled={busy}>Cancel</button>
         <button className="btn btn-primary btn-sm" onClick={apply} disabled={busy}>Apply</button>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
