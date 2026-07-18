@@ -10,7 +10,9 @@ from models import (
     STATUSES,
     AuditLog,
     Favorite,
+    Folder,
     Skill,
+    SkillFolder,
     SkillPermission,
     SkillRelationship,
     SkillVersion,
@@ -18,6 +20,8 @@ from models import (
     utcnow,
 )
 from activity_log import set_activity_summary
+
+_UNSET = object()
 
 
 # --- audit -----------------------------------------------------------------
@@ -97,6 +101,82 @@ def favorites_of(target_user, viewer):
 
 def visible_favorites(user):
     return favorites_of(user, user)
+
+
+# --- folders -----------------------------------------------------------
+
+def get_folder_or_404(folder_id):
+    folder = db.session.get(Folder, folder_id)
+    if folder is None:
+        abort(404, description="Folder not found")
+    return folder
+
+
+def _sibling_name_taken(name, parent_id, exclude_id=None):
+    q = Folder.query.filter_by(name=name, parent_id=parent_id)
+    if exclude_id is not None:
+        q = q.filter(Folder.id != exclude_id)
+    return q.first() is not None
+
+
+def _would_create_cycle(folder, new_parent_id):
+    """True if making new_parent_id the parent of `folder` forms a cycle."""
+    current_id = new_parent_id
+    while current_id is not None:
+        if current_id == folder.id:
+            return True
+        parent = db.session.get(Folder, current_id)
+        current_id = parent.parent_id if parent else None
+    return False
+
+
+def create_folder(user, name, parent_id):
+    name = (name or "").strip()
+    if not name:
+        abort(400, description="Folder name is required")
+    if parent_id is not None and db.session.get(Folder, parent_id) is None:
+        abort(400, description="Parent folder not found")
+    if _sibling_name_taken(name, parent_id):
+        abort(400, description="A folder with this name already exists here")
+    folder = Folder(name=name, parent_id=parent_id, created_by=user.id)
+    db.session.add(folder)
+    db.session.commit()
+    return folder
+
+
+def update_folder(user, folder, name=_UNSET, parent_id=_UNSET):
+    new_name = folder.name if name is _UNSET else (name or "").strip()
+    if not new_name:
+        abort(400, description="Folder name is required")
+    new_parent_id = folder.parent_id if parent_id is _UNSET else parent_id
+    if parent_id is not _UNSET and parent_id is not None:
+        if db.session.get(Folder, parent_id) is None:
+            abort(400, description="Parent folder not found")
+        if _would_create_cycle(folder, parent_id):
+            abort(400, description="Cannot move a folder into itself or a descendant")
+    if _sibling_name_taken(new_name, new_parent_id, exclude_id=folder.id):
+        abort(400, description="A folder with this name already exists here")
+    folder.name = new_name
+    folder.parent_id = new_parent_id
+    db.session.commit()
+    return folder
+
+
+def delete_folder(user, folder):
+    db.session.delete(folder)  # cascade removes subfolders + memberships
+    db.session.commit()
+
+
+def visible_folder_tree(user):
+    """All folders as a flat list; skill_count counts memberships whose skill
+    is visible to `user`. The frontend nests by parent_id."""
+    visible_ids = {s.id for s in visible_skills(user)}
+    counts = {}
+    for link in SkillFolder.query.all():
+        if link.skill_id in visible_ids:
+            counts[link.folder_id] = counts.get(link.folder_id, 0) + 1
+    folders = Folder.query.order_by(Folder.name).all()
+    return [f.to_dict(skill_count=counts.get(f.id, 0)) for f in folders]
 
 
 # --- skill lifecycle -------------------------------------------------------
