@@ -1,9 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 
 export default function FavoriteStar({ skillId, favorited, onChange }) {
   const [on, setOn] = useState(!!favorited)
   const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    setOn(!!favorited)
+  }, [favorited, skillId])
 
   const toggle = async (e) => {
     e.stopPropagation()
