@@ -3,10 +3,11 @@
 Reading the tree is open to any logged-in user (read-only navigation);
 every mutation requires admin.
 """
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, abort, jsonify, request
 from flask_login import current_user, login_required
 
 from services import (
+    bulk_assign,
     create_folder,
     delete_folder,
     get_folder_or_404,
@@ -55,3 +56,16 @@ def delete(folder_id):
     folder = get_folder_or_404(folder_id)
     delete_folder(current_user, folder)
     return jsonify({"status": "deleted"})
+
+
+@folders_bp.post("/<int:folder_id>/skills")
+@login_required
+def assign_skills(folder_id):
+    require_admin(current_user)
+    folder = get_folder_or_404(folder_id)
+    data = request.get_json(silent=True) or {}
+    skill_ids = data.get("skill_ids", [])
+    if not isinstance(skill_ids, list):
+        abort(400, description="skill_ids must be a list")
+    bulk_assign(folder, skill_ids, data.get("mode", "move"))
+    return jsonify({"status": "ok"})

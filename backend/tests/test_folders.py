@@ -63,3 +63,80 @@ def test_reparent_to_root_does_not_delete_folder(client, admin_user, login):
     assert "B" in by_name
     assert by_name["B"]["id"] == b["id"]
     assert by_name["B"]["parent_id"] is None
+
+
+def test_set_and_move_membership(client, admin_user, login, make_skill):
+    login(admin_user)
+    skill_id = make_skill(admin_user, "Movable")
+    a = client.post("/api/folders", json={"name": "A"}).get_json()
+    b = client.post("/api/folders", json={"name": "B"}).get_json()
+
+    # multi-membership via PUT
+    client.put(f"/api/skills/{skill_id}/folders", json={"folder_ids": [a["id"], b["id"]]})
+    folders = client.get(f"/api/skills/{skill_id}").get_json()["folders"]
+    assert {f["id"] for f in folders} == {a["id"], b["id"]}
+
+    tree = {f["name"]: f["skill_count"] for f in client.get("/api/folders").get_json()}
+    assert tree["A"] == 1 and tree["B"] == 1
+
+    # drag = move (exact single membership)
+    client.put(f"/api/skills/{skill_id}/folders", json={"folder_ids": [a["id"]]})
+    folders = client.get(f"/api/skills/{skill_id}").get_json()["folders"]
+    assert {f["id"] for f in folders} == {a["id"]}
+
+    # unfile
+    client.put(f"/api/skills/{skill_id}/folders", json={"folder_ids": []})
+    assert client.get(f"/api/skills/{skill_id}").get_json()["folders"] == []
+
+
+def test_bulk_assign_move_and_add(client, admin_user, login, make_skill):
+    login(admin_user)
+    s1 = make_skill(admin_user, "S1")
+    s2 = make_skill(admin_user, "S2")
+    a = client.post("/api/folders", json={"name": "A"}).get_json()
+    b = client.post("/api/folders", json={"name": "B"}).get_json()
+
+    client.post(f"/api/folders/{a['id']}/skills", json={"skill_ids": [s1, s2], "mode": "move"})
+    tree = {f["name"]: f["skill_count"] for f in client.get("/api/folders").get_json()}
+    assert tree["A"] == 2
+
+    client.post(f"/api/folders/{b['id']}/skills", json={"skill_ids": [s1], "mode": "add"})
+    folders = {f["id"] for f in client.get(f"/api/skills/{s1}").get_json()["folders"]}
+    assert folders == {a["id"], b["id"]}
+
+
+def test_skills_folder_query_filter(client, admin_user, login, make_skill):
+    login(admin_user)
+    s1 = make_skill(admin_user, "In A")
+    s2 = make_skill(admin_user, "Unfiled One")
+    a = client.post("/api/folders", json={"name": "A"}).get_json()
+    client.put(f"/api/skills/{s1}/folders", json={"folder_ids": [a["id"]]})
+
+    in_a = [s["id"] for s in client.get(f"/api/skills?folder={a['id']}").get_json()]
+    assert in_a == [s1]
+
+    unfiled = [s["id"] for s in client.get("/api/skills?folder=unfiled").get_json()]
+    assert s2 in unfiled and s1 not in unfiled
+
+
+def test_membership_admin_only(client, regular_user, login, make_skill):
+    skill_id = make_skill(regular_user, "Owned")
+    login(regular_user)
+    assert client.put(f"/api/skills/{skill_id}/folders",
+                      json={"folder_ids": []}).status_code == 403
+
+
+def test_folder_skill_count_respects_viewer_visibility(client, admin_user, regular_user, login, make_skill):
+    """The folder tree is visible to all, but skill_count reflects only the
+    viewer's visible skills (not every membership in the folder)."""
+    login(admin_user)
+    skill_id = make_skill(admin_user, "Private")
+    a = client.post("/api/folders", json={"name": "A"}).get_json()
+    client.put(f"/api/skills/{skill_id}/folders", json={"folder_ids": [a["id"]]})
+
+    tree = {f["name"]: f["skill_count"] for f in client.get("/api/folders").get_json()}
+    assert tree["A"] == 1
+
+    login(regular_user)
+    tree = {f["name"]: f["skill_count"] for f in client.get("/api/folders").get_json()}
+    assert tree["A"] == 0

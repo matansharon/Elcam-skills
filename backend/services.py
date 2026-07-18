@@ -179,6 +179,47 @@ def visible_folder_tree(user):
     return [f.to_dict(skill_count=counts.get(f.id, 0)) for f in folders]
 
 
+def skill_folders(skill):
+    """List of {id, name} for the folders this skill belongs to."""
+    result = []
+    for link in SkillFolder.query.filter_by(skill_id=skill.id):
+        folder = db.session.get(Folder, link.folder_id)
+        if folder is not None:
+            result.append({"id": folder.id, "name": folder.name})
+    return result
+
+
+def set_skill_folders(skill, folder_ids):
+    """Replace the skill's folder memberships with exactly folder_ids."""
+    ids = list(dict.fromkeys(folder_ids or []))  # de-dupe, keep order
+    for fid in ids:
+        if db.session.get(Folder, fid) is None:
+            abort(400, description=f"Folder {fid} not found")
+    SkillFolder.query.filter_by(skill_id=skill.id).delete()
+    for fid in ids:
+        db.session.add(SkillFolder(skill_id=skill.id, folder_id=fid))
+    db.session.commit()
+
+
+def bulk_assign(folder, skill_ids, mode):
+    """mode 'move' sets each skill's membership to exactly [folder]; mode
+    'add' adds folder to each skill's existing memberships."""
+    if mode not in ("move", "add"):
+        abort(400, description="mode must be 'move' or 'add'")
+    for sid in skill_ids or []:
+        if db.session.get(Skill, sid) is None:
+            abort(404, description=f"Skill {sid} not found")
+        if mode == "move":
+            SkillFolder.query.filter_by(skill_id=sid).delete()
+            db.session.add(SkillFolder(skill_id=sid, folder_id=folder.id))
+        else:
+            exists = SkillFolder.query.filter_by(
+                skill_id=sid, folder_id=folder.id).first()
+            if exists is None:
+                db.session.add(SkillFolder(skill_id=sid, folder_id=folder.id))
+    db.session.commit()
+
+
 # --- skill lifecycle -------------------------------------------------------
 
 def _clean_tags(raw):
