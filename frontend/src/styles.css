@@ -1033,7 +1033,7 @@ table.data td.cell-muted {
 }
 
 .folder-sidebar {
-  border: 1px solid var(--border, #2a2f3a);
+  border: 1px solid var(--line);
   border-radius: 8px;
   padding: 0.5rem;
   font-size: 0.9rem;
@@ -1056,8 +1056,8 @@ table.data td.cell-muted {
   border-radius: 6px;
   cursor: pointer;
 }
-.folder-row:hover { background: var(--hover, #1c2130); }
-.folder-row.is-selected { background: var(--accent-muted, #24304a); }
+.folder-row:hover { background: var(--line); }
+.folder-row.is-selected { background: var(--accent-soft); color: var(--accent-deep); font-weight: 600; }
 .folder-twisty {
   background: none; border: none; color: inherit; cursor: pointer;
   width: 1.1em; text-align: center; padding: 0;
@@ -1076,7 +1076,7 @@ table.data td.cell-muted {
 .bulk-bar {
   display: flex; align-items: center; gap: 0.75rem;
   padding: 0.5rem 0.75rem; margin-bottom: 0.5rem;
-  border: 1px solid var(--accent-muted, #24304a); border-radius: 8px;
+  border: 1px solid var(--accent); background: var(--accent-soft); border-radius: 8px;
 }
 .cell-select { display: flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
 .cell-access { position: relative; white-space: nowrap; }
@@ -1086,8 +1086,8 @@ table.data td.cell-muted {
 .folder-menu {
   position: absolute; right: 0; top: 100%; z-index: 30;
   min-width: 200px; margin-top: 4px; padding: 0.5rem;
-  background: var(--panel, #141824); border: 1px solid var(--border, #2a2f3a);
-  border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  background: #fff; border: 1px solid var(--line-strong);
+  border-radius: 8px; box-shadow: 0 8px 24px rgba(15, 45, 55, 0.18);
 }
 .folder-menu-title { font-weight: 600; margin-bottom: 0.4rem; }
 .folder-menu-list { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.25rem; }
