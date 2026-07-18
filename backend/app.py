@@ -32,6 +32,7 @@ def create_app(config_overrides=None):
 
     from activity import activity_bp
     from auth import auth_bp
+    from favorites import favorites_bp
     from relationships import relationships_bp
     from skills import skills_bp
     from users import users_bp
@@ -40,6 +41,7 @@ def create_app(config_overrides=None):
     app.register_blueprint(skills_bp)
     app.register_blueprint(relationships_bp)
     app.register_blueprint(users_bp)
+    app.register_blueprint(favorites_bp)
 
     from activity_log import record_request, start_timer
     app.before_request(start_timer)

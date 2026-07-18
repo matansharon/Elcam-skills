@@ -13,6 +13,7 @@ from services import (
     create_skill_from_package,
     create_version_from_package,
     delete_skill,
+    favorite_skill_ids,
     get_permission_level,
     get_visible_skill_or_404,
     require_edit,
@@ -62,6 +63,7 @@ def list_skills():
     owner = (request.args.get("owner") or "").strip()
     status = (request.args.get("status") or "").strip()
 
+    fav_ids = favorite_skill_ids(current_user)
     result = []
     for skill in visible_skills(current_user):
         if q and q not in skill.name.lower() and q not in (skill.description or "").lower():
@@ -75,7 +77,10 @@ def list_skills():
         if owner and str(skill.owner_id) != owner and skill.owner.display_name != owner:
             continue
         result.append(
-            skill.to_dict(my_permission=get_permission_level(current_user, skill))
+            skill.to_dict(
+                my_permission=get_permission_level(current_user, skill),
+                favorited=skill.id in fav_ids,
+            )
         )
     result.sort(key=lambda s: s["updated_at"], reverse=True)
     return jsonify(result)
@@ -143,8 +148,12 @@ def upload_create():
 @login_required
 def get_skill(skill_id):
     skill = get_visible_skill_or_404(current_user, skill_id)
+    fav_ids = favorite_skill_ids(current_user)
     return jsonify(
-        skill.to_dict(my_permission=get_permission_level(current_user, skill))
+        skill.to_dict(
+            my_permission=get_permission_level(current_user, skill),
+            favorited=skill.id in fav_ids,
+        )
     )
 
 

@@ -9,6 +9,7 @@ from models import (
     RELATIONSHIP_TYPES,
     STATUSES,
     AuditLog,
+    Favorite,
     Skill,
     SkillPermission,
     SkillRelationship,
@@ -66,6 +67,36 @@ def get_visible_skill_or_404(user, skill_id):
 def require_edit(user, skill):
     if get_permission_level(user, skill) != "edit":
         abort(403, description="Edit permission required")
+
+
+def require_admin(user):
+    if not user.is_admin:
+        abort(403, description="Admin access required")
+
+
+# --- favorites -------------------------------------------------------------
+
+def favorite_skill_ids(user):
+    return {f.skill_id for f in Favorite.query.filter_by(user_id=user.id)}
+
+
+def toggle_favorite(user, skill, on):
+    existing = Favorite.query.filter_by(user_id=user.id, skill_id=skill.id).first()
+    if on and existing is None:
+        db.session.add(Favorite(user_id=user.id, skill_id=skill.id))
+    elif not on and existing is not None:
+        db.session.delete(existing)
+    db.session.commit()
+
+
+def favorites_of(target_user, viewer):
+    """Skills favorited by target_user, filtered to viewer's visibility."""
+    fav_ids = {f.skill_id for f in Favorite.query.filter_by(user_id=target_user.id)}
+    return [s for s in visible_skills(viewer) if s.id in fav_ids]
+
+
+def visible_favorites(user):
+    return favorites_of(user, user)
 
 
 # --- skill lifecycle -------------------------------------------------------
