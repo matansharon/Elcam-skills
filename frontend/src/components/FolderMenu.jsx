@@ -15,6 +15,19 @@ export default function FolderMenu({ skillId, currentFolderIds, folders, anchorR
     return () => document.removeEventListener('mousedown', onDoc)
   }, [onClose])
 
+  // The popover is positioned from a rect captured once, so close it on any
+  // scroll/resize rather than let it drift away from its trigger. Capture phase
+  // catches the horizontally-scrolling table wrapper too.
+  useEffect(() => {
+    const close = () => onClose?.()
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => {
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+    }
+  }, [onClose])
+
   const toggle = (id) => {
     setChecked((prev) => {
       const next = new Set(prev)
@@ -50,6 +63,8 @@ export default function FolderMenu({ skillId, currentFolderIds, folders, anchorR
         margin: 0,
       }
     : {}
+
+  if (!anchorRect) return null
 
   return createPortal(
     <div className="folder-menu" ref={ref} style={style}>
