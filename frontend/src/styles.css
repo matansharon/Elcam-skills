@@ -24,6 +24,8 @@
   --red: #b91c1c;
   --red-soft: #fdeaea;
   --radius: 6px;
+  --nav-height: 58px;
+  --content-max: 1240px;
   --shadow: 0 1px 2px rgba(20, 35, 43, 0.06), 0 4px 16px rgba(20, 35, 43, 0.05);
   --font-ui: 'Schibsted Grotesk', 'Segoe UI', sans-serif;
   --font-mono: 'IBM Plex Mono', Consolas, monospace;
@@ -90,23 +92,37 @@ a:hover {
   flex-direction: column;
 }
 
+/* The Dashboard is a two-pane data view, not a reading column — give it a wider
+   content box than the global default. Set on .app-shell so both .app-main and
+   .top-nav-inner inherit it and stay horizontally aligned as they widen. */
+.app-shell:has(.dashboard-layout) {
+  --content-max: 1600px;
+}
+
 .top-nav {
-  display: flex;
-  align-items: center;
-  gap: 32px;
-  padding: 0 28px;
-  height: 58px;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
   position: sticky;
   top: 0;
   z-index: 20;
 }
+.top-nav-inner {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 0 28px;
+  min-height: var(--nav-height);
+}
 
 .nav-links {
   display: flex;
   gap: 4px;
   flex: 1;
+  min-width: 0;
 }
 .nav-links a {
   padding: 6px 14px;
@@ -146,10 +162,27 @@ a:hover {
   letter-spacing: 0.08em;
 }
 
+/* On narrow screens let the nav wrap instead of forcing page-wide horizontal
+   scroll: the links drop to their own row beneath the wordmark + user controls. */
+@media (max-width: 720px) {
+  .top-nav-inner {
+    gap: 12px;
+    padding: 8px 16px;
+  }
+  .nav-links {
+    flex-basis: 100%;
+    order: 3;
+    flex-wrap: wrap;
+  }
+  .user-chip em {
+    display: none;
+  }
+}
+
 .app-main {
   flex: 1;
   width: 100%;
-  max-width: 1240px;
+  max-width: var(--content-max);
   margin: 0 auto;
   padding: 28px;
 }
@@ -1028,9 +1061,23 @@ table.data td.cell-muted {
   align-items: start;
 }
 .dashboard-main { min-width: 0; }
-@media (max-width: 720px) {
+/* Stack the sidebar above the table across the whole tablet/small-laptop band —
+   a fixed 240px sidebar next to a wide table starves the table below ~1024px. */
+@media (max-width: 1024px) {
   .dashboard-layout { grid-template-columns: 1fr; }
 }
+
+/* Let the flexible columns wrap and trim cell padding so the 9-column table fits
+   its track instead of forcing a rigid ~947px min-content (constant h-scroll).
+   Scoped to .dashboard-main so the 5 other .data tables are untouched; atomic
+   cells (.cell-select, .cell-access) keep their nowrap from below. */
+.dashboard-main table.data th { white-space: normal; }
+.dashboard-main table.data th,
+.dashboard-main table.data td { padding: 9px 12px; }
+.dashboard-main table.data td.cell-muted { white-space: normal; }
+/* Only the long free-text description may break inside words to stay compact;
+   short values (category, owner) wrap at word boundaries so they never split. */
+.dashboard-main table.data td.cell-desc { overflow-wrap: anywhere; }
 
 .folder-sidebar {
   border: 1px solid var(--line);
@@ -1038,7 +1085,7 @@ table.data td.cell-muted {
   padding: 0.5rem;
   font-size: 0.9rem;
   position: sticky;
-  top: 1rem;
+  top: calc(var(--nav-height) + 1rem);
 }
 .folder-sidebar-head {
   display: flex;
@@ -1079,12 +1126,12 @@ table.data td.cell-muted {
   border: 1px solid var(--accent); background: var(--accent-soft); border-radius: 8px;
 }
 .cell-select { display: flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
-.cell-access { position: relative; white-space: nowrap; }
-.folder-menu-anchor { position: relative; }
+.cell-access { white-space: nowrap; }
 
-/* Folder membership popover */
+/* Folder membership popover — rendered in a body portal with an inline
+   position:fixed computed from the trigger's rect (see FolderMenu.jsx). */
 .folder-menu {
-  position: absolute; right: 0; top: 100%; z-index: 30;
+  position: fixed; z-index: 30;
   min-width: 200px; margin-top: 4px; padding: 0.5rem;
   background: #fff; border: 1px solid var(--line-strong);
   border-radius: 8px; box-shadow: 0 8px 24px rgba(15, 45, 55, 0.18);
@@ -1092,6 +1139,9 @@ table.data td.cell-muted {
 .folder-menu-title { font-weight: 600; margin-bottom: 0.4rem; }
 .folder-menu-list { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.25rem; }
 .folder-menu-item { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+/* Keep the checkbox its natural size — the global input{width:100%} would
+   otherwise stretch it across the row and shove the label text to the right. */
+.folder-menu-item input { width: auto; flex: none; }
 .folder-menu-actions { display: flex; justify-content: flex-end; gap: 0.4rem; margin-top: 0.5rem; }
 .folder-menu-error { color: #c0392b; font-size: 0.8rem; margin-top: 0.4rem; }
 tr[draggable='true'] { cursor: grab; }

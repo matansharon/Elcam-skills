@@ -283,7 +283,7 @@ export default function Dashboard() {
                     <td className="cell-name">
                       <Link to={`/skills/${s.id}`}>{s.name}</Link>
                     </td>
-                    <td className="cell-muted">
+                    <td className="cell-muted cell-desc">
                       {s.description.length > 70
                         ? s.description.slice(0, 70) + '…'
                         : s.description}

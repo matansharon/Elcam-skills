@@ -26,28 +26,30 @@ function Layout() {
   return (
     <div className="app-shell">
       <header className="top-nav">
-        <div className="wordmark">
-          <span className="wordmark-block" />
-          <span className="wordmark-text">
-            ELCAM <em>/</em> SKILL REGISTRY
-          </span>
-        </div>
-        <nav className="nav-links">
-          <NavLink to="/" end>
-            Dashboard
-          </NavLink>
-          <NavLink to="/graph">Graph</NavLink>
-          <NavLink to={`/users/${user?.id}`}>My Page</NavLink>
-          {user?.role === 'admin' && <NavLink to="/admin">Admin</NavLink>}
-        </nav>
-        <div className="nav-user">
-          <span className="user-chip">
-            {user?.display_name}
-            <em>{user?.role}</em>
-          </span>
-          <button className="btn btn-ghost" onClick={logout}>
-            Sign out
-          </button>
+        <div className="top-nav-inner">
+          <div className="wordmark">
+            <span className="wordmark-block" />
+            <span className="wordmark-text">
+              ELCAM <em>/</em> SKILL REGISTRY
+            </span>
+          </div>
+          <nav className="nav-links">
+            <NavLink to="/" end>
+              Dashboard
+            </NavLink>
+            <NavLink to="/graph">Graph</NavLink>
+            <NavLink to={`/users/${user?.id}`}>My Page</NavLink>
+            {user?.role === 'admin' && <NavLink to="/admin">Admin</NavLink>}
+          </nav>
+          <div className="nav-user">
+            <span className="user-chip">
+              {user?.display_name}
+              <em>{user?.role}</em>
+            </span>
+            <button className="btn btn-ghost" onClick={logout}>
+              Sign out
+            </button>
+          </div>
         </div>
       </header>
       <main className="app-main">
